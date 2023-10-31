@@ -5,45 +5,54 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
-	"time"
 )
 
-func main() {
-	arguments := os.Args
-	if len(arguments) == 1 {
-		fmt.Println("Please provide port number")
-		return
-	}
+var count = 0
 
-	PORT := ":" + arguments[1]
-	l, err := net.Listen("tcp", PORT)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer l.Close()
-
-	c, err := l.Accept()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
+func handleConnection(c net.Conn) {
+	fmt.Print(".")
 	for {
 		netData, err := bufio.NewReader(c).ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		if strings.TrimSpace(string(netData)) == "STOP" {
-			fmt.Println("Exiting TCP server!")
+
+		temp := strings.TrimSpace(string(netData))
+		if temp == "STOP" {
+			break
+		}
+		fmt.Println(temp)
+		counter := strconv.Itoa(count) + "\n"
+		c.Write([]byte(string(counter)))
+	}
+	c.Close()
+}
+
+func main() {
+	arguments := os.Args
+	if len(arguments) == 1 {
+		fmt.Println("Please provide a port number!")
+		return
+	}
+
+	PORT := ":" + arguments[1]
+	l, err := net.Listen("tcp4", PORT)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer l.Close()
+
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			fmt.Println(err)
 			return
 		}
-
-		fmt.Print("-> ", string(netData))
-		t := time.Now()
-		myTime := t.Format(time.RFC3339) + "\n"
-		c.Write([]byte(myTime))
+		go handleConnection(c)
+		count++
 	}
 }
