@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net"
 	"net/http"
@@ -77,7 +77,7 @@ func handleGet(conn net.Conn, request *http.Request) {
 		return
 	}
 
-	data, err := ioutil.ReadFile(path[1:]) // Removing the leading '/'
+	data, err := os.ReadFile(path[1:]) // Removing the leading '/'
 	if os.IsNotExist(err) {
 		sendResponse(conn, http.StatusNotFound, "text/plain", "Not Found\n")
 		return
@@ -98,14 +98,14 @@ func handlePost(conn net.Conn, request *http.Request) {
 		return
 	}
 
-	data, err := ioutil.ReadAll(request.Body)
+	data, err := io.ReadAll(request.Body)
 	if err != nil {
 		fmt.Println("Error reading POST data:", err)
 		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
 		return
 	}
 
-	err = ioutil.WriteFile(path[1:], data, 0644) // Removing the leading '/'
+	err = os.WriteFile(path[1:], data, 0644) // Removing the leading '/'
 	if err != nil {
 		fmt.Println("Error writing file:", err)
 		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
@@ -123,7 +123,7 @@ func sendResponse(conn net.Conn, status int, contentType, body string) {
 		Header:     make(http.Header),
 	}
 	response.Header.Set("Content-Type", contentType)
-	response.Body = ioutil.NopCloser(strings.NewReader(body))
+	response.Body = io.NopCloser(strings.NewReader(body))
 
 	response.Write(conn)
 }
