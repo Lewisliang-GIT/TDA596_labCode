@@ -8,10 +8,6 @@ import (
 
 var customTransport = http.DefaultTransport
 
-func init() {
-	// Here, you can customize the transport, e.g., set timeouts or enable/disable keep-alive
-}
-
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 	// Create a new HTTP request with the same method, URL, and body as the original request
 	targetURL := r.URL
