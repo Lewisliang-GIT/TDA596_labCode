@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
 var customTransport = http.DefaultTransport
@@ -46,16 +48,21 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, resp.Body)
 }
 
-// TODO: make port changeable.
 func main() {
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: ./http_server <port>")
+		os.Exit(1)
+	}
+	port := os.Args[1]
+
 	// Create a new HTTP server with the handleRequest function as the handler
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + port,
 		Handler: http.HandlerFunc(handleRequest),
 	}
 
 	// Start the server and log any errors
-	log.Println("Starting proxy server on :8080")
+	log.Println("Starting proxy server on :" + port)
 	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal("Error starting proxy server: ", err)
