@@ -44,6 +44,7 @@ func main() {
 			defer wg.Done()
 			handleConnection(conn)
 			<-sem // Release the token
+			fmt.Println(sem)
 		}()
 	}
 	wg.Wait()
