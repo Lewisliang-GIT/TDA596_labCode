@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
+	"mime"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -43,6 +44,7 @@ func main() {
 			defer wg.Done()
 			handleConnection(conn)
 			<-sem // Release the token
+			fmt.Println(sem)
 		}()
 	}
 	wg.Wait()
@@ -53,129 +55,89 @@ func handleConnection(conn net.Conn) {
 
 	request, err := http.ReadRequest(bufio.NewReader(conn))
 	if err != nil {
-		log.Println(err)
+		fmt.Println("Error reading request:", err)
+		sendResponse(conn, http.StatusBadRequest, "text/plain", "Bad Request\n")
 		return
 	}
+	defer request.Body.Close()
 
-	// Handle the request
-	switch req.Method {
+	switch request.Method {
 	case http.MethodGet:
-		handleGETRequest(c, req)
+		handleGet(conn, request)
 	case http.MethodPost:
-		handlePOSTRequest(c, req)
+		handlePost(conn, request)
 	default:
-		// Return a "Not Implemented" error
-		http.Error(c, "Not implemented", http.StatusNotImplemented)
-	}
-
-	// Close the connection
-	c.Close()
-}
-
-// Handler for GET requests
-func handleGETRequest(c net.Conn, req *http.Request) {
-	// Get the file path from the request URL
-	filePath := req.URL.Path
-
-	// Check if the file is in the cache
-	if contents, ok := fileCache.Load(filePath); ok {
-		// If the file is in the cache, write it to the connection
-		_, err := c.Write(contents.([]byte))
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		return
-	}
-
-	// If the file is not in the cache, read it from the local filesystem
-	file, err := os.Open(filePath)
-	if err != nil {
-		// If the file does not exist, return a 404 error
-		if os.IsNotExist(err) {
-			http.NotFound(c, req)
-			return
-		}
-
-		// If there is another error, log it and return a 500 error
-		log.Println(err)
-		http.Error(c, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	defer file.Close()
-
-	// Read the file contents into memory
-	contents, err := io.Copy(os.Stdout, file)
-	if err != nil {
-		// If there is an error reading the file, log it and return a 500 error
-		log.Println(err)
-		http.Error(c, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	// Add the file contents to the cache
-	fileCache.Store(filePath, contents)
-
-	// Write the file contents to the connection
-	_, err = c.Write(contents)
-	if err != nil {
-		log.Println(err)
-		return
+		sendResponse(conn, http.StatusNotImplemented, "text/plain", "Not Implemented\n")
 	}
 }
 
-// Handler for POST requests
-func handlePOSTRequest(c net.Conn, req *http.Request) {
-	// Read the request body
-	body, err := io.Copy(os.Stdout, req.Body)
-	if err != nil {
-		log.Println(err)
+func handleGet(conn net.Conn, request *http.Request) {
+	path := request.URL.Path
+	if !isValidPath(path) {
+		sendResponse(conn, http.StatusBadRequest, "text/plain", "Bad Request\n")
 		return
 	}
 
-	// Save the request body to a file
-	filePath := "./post_request.txt"
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Println(err)
+	data, err := os.ReadFile(path[1:]) // Removing the leading '/'
+	if os.IsNotExist(err) {
+		sendResponse(conn, http.StatusNotFound, "text/plain", "Not Found\n")
+		return
+	} else if err != nil {
+		fmt.Println("Error reading file:", err)
+		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
 		return
 	}
 
-	defer file.Close()
-
-	_, err = file.Write(body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	// Write a response to the connection
-	_, err = c.Write([]byte("POST request body saved to file"))
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	contentType := mime.TypeByExtension(path)
+	sendResponse(conn, http.StatusOK, contentType, string(data))
 }
 
-func main() {
-	// Create a new TCP listener
-	listener, err := net.Listen("tcp", port)
+func handlePost(conn net.Conn, request *http.Request) {
+	path := request.URL.Path
+	if !isValidPath(path) {
+		sendResponse(conn, http.StatusBadRequest, "text/plain", "Bad Request\n")
+		return
+	}
+
+	data, err := io.ReadAll(request.Body)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error reading POST data:", err)
+		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
+		return
 	}
 
-	defer listener.Close()
+	err = os.WriteFile(path[1:], data, 0644) // Removing the leading '/'
+	if err != nil {
+		fmt.Println("Error writing file:", err)
+		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
+		return
+	}
 
-	// Accept incoming connections and handle them concurrently
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Println(err)
-			continue
+	sendResponse(conn, http.StatusOK, "text/plain", "OK\n")
+}
+
+func sendResponse(conn net.Conn, status int, contentType, body string) {
+	response := http.Response{
+		StatusCode: status,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     make(http.Header),
+	}
+	response.Header.Set("Content-Type", contentType)
+	response.Body = io.NopCloser(strings.NewReader(body))
+
+	response.Write(conn)
+}
+
+func isValidPath(path string) bool {
+	if !strings.HasPrefix(path, "/") {
+		return false
+	}
+	ext := strings.ToLower(path)
+	for _, validExt := range []string{".html", ".txt", ".gif", ".jpeg", ".jpg", ".css"} {
+		if strings.HasSuffix(ext, validExt) {
+			return true
 		}
-
-		go handleGET(conn)
 	}
+	return false
 }
