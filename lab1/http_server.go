@@ -108,21 +108,27 @@ func handlePost(conn net.Conn, request *http.Request) {
 		defer file.Close()
 		defer saveFile.Close()
 	} else {
-		data, err := io.ReadAll(request.Body)
-		if err != nil {
-			fmt.Println("Error reading POST data:", err)
-			sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
-			return
-		}
+		// data, err := io.ReadAll(request.Body)
+		// if err != nil {
+		// 	fmt.Println("Error reading POST data:", err)
+		// 	sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
+		// 	return
+		// }
 
-		err = os.WriteFile(path[1:], data, 0644) // Removing the leading '/'
-		if err != nil {
-			fmt.Println("Error writing file:", err)
-			sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
-			return
-		}
+		// err = os.WriteFile(path[1:], data, 0644) // Removing the leading '/'
+		// if err != nil {
+		// 	fmt.Println("Error writing file:", err)
+		// 	sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
+		// 	return
+		// }
+		file, _, _ := request.FormFile("file")
+		os.Mkdir("./file/", 0777)
+		saveFile, _ := os.OpenFile("./file/"+path[1:], os.O_WRONLY|os.O_CREATE, 0666)
+		io.Copy(saveFile, file)
+
+		defer file.Close()
+		defer saveFile.Close()
 	}
-
 	sendResponse(conn, http.StatusOK, "text/plain", "OK\n")
 }
 
