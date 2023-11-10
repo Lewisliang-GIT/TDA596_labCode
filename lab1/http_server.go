@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -108,20 +107,20 @@ func handlePost(conn net.Conn, request *http.Request) {
 
 		defer file.Close()
 		defer saveFile.Close()
-	}
+	} else {
+		data, err := io.ReadAll(request.Body)
+		if err != nil {
+			fmt.Println("Error reading POST data:", err)
+			sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
+			return
+		}
 
-	data, err := io.ReadAll(request.Body)
-	if err != nil {
-		fmt.Println("Error reading POST data:", err)
-		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
-		return
-	}
-
-	err = os.WriteFile(path[1:], data, 0644) // Removing the leading '/'
-	if err != nil {
-		fmt.Println("Error writing file:", err)
-		sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
-		return
+		err = os.WriteFile(path[1:], data, 0644) // Removing the leading '/'
+		if err != nil {
+			fmt.Println("Error writing file:", err)
+			sendResponse(conn, http.StatusInternalServerError, "text/plain", "Internal Server Error\n")
+			return
+		}
 	}
 
 	sendResponse(conn, http.StatusOK, "text/plain", "OK\n")
@@ -164,14 +163,4 @@ func isImage(path string) bool {
 		}
 	}
 	return false
-}
-
-func base2Img(imageString string, filename string) {
-
-	ddd, _ := base64.StdEncoding.DecodeString(imageString)
-
-	err := os.WriteFile(filename, ddd, 0666)
-
-	fmt.Println(err)
-
 }
