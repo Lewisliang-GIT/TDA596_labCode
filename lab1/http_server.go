@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -99,6 +100,16 @@ func handlePost(conn net.Conn, request *http.Request) {
 		return
 	}
 
+	if isImage(path) {
+		file, _, _ := request.FormFile("file")
+		os.Mkdir("./uploaded/", 0777)
+		saveFile, _ := os.OpenFile("./uploaded/"+path[1:], os.O_WRONLY|os.O_CREATE, 0666)
+		io.Copy(saveFile, file)
+
+		defer file.Close()
+		defer saveFile.Close()
+	}
+
 	data, err := io.ReadAll(request.Body)
 	if err != nil {
 		fmt.Println("Error reading POST data:", err)
@@ -140,4 +151,27 @@ func isValidPath(path string) bool {
 		}
 	}
 	return false
+}
+
+func isImage(path string) bool {
+	if !strings.HasPrefix(path, "/") {
+		return false
+	}
+	ext := strings.ToLower(path)
+	for _, validExt := range []string{".gif", ".jpeg", ".jpg"} {
+		if strings.HasSuffix(ext, validExt) {
+			return true
+		}
+	}
+	return false
+}
+
+func base2Img(imageString string, filename string) {
+
+	ddd, _ := base64.StdEncoding.DecodeString(imageString)
+
+	err := os.WriteFile(filename, ddd, 0666)
+
+	fmt.Println(err)
+
 }
