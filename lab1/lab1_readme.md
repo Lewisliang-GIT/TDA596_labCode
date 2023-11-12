@@ -108,7 +108,7 @@ Parses the request line string, returning the request method, path, HTTP version
 `drainConnectRequestHeader`: 
 Reads the data in the CONNECT request header to ensure that there are no residuals from the TLS handshake.
 
-## Main function
+### Main function of proxy.go
 
 ```go
 port := flag.Int("port", 8080, "listening port number")
