@@ -90,7 +90,8 @@ func (c *connection) serve() {
 	// If we are going to proxy a https request, we just simply discard `poachedData`, which contains
 	// the entire connect header;
 	// Otherwise, we forward `poachedData` alone with remaining header and body to the remote host.
-	if secure {
+
+	/*if secure {
 		c.reqConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 	} else {
 		_, err = remoteConn.Write(poachedData)
@@ -98,7 +99,14 @@ func (c *connection) serve() {
 			log.Printf("WARNING: Failed to write request header to remote host! %v", err)
 			return
 		}
+	}*/
+	
+	_, err = remoteConn.Write(poachedData)
+	if err != nil {
+		log.Printf("WARNING: Failed to write request header to remote host! %v", err)
+		return
 	}
+	
 
 	log.Printf("Begin to tunneling connections %s <-> %s", c.reqConn.LocalAddr(), remoteAddr)
 
