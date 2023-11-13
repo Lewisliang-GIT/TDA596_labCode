@@ -28,13 +28,11 @@ curl -X POST localhost:1234/1.jpeg -F "file=@1.jpeg" -x localhost:9090
 For get function:
 ```
  curl -X GET <server address>:<port>/<file path> -x  <proxy address>:<port> > <output path>
-
 ```
 
 Example:
 ```
 curl -X GET localhost:1234/uploaded/1.jpeg -x  localhost:9090 >output/3.jpeg
-
 ```
 
 ## http_server.go
