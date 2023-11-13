@@ -9,6 +9,8 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 )
 
@@ -61,7 +63,15 @@ func NewServer(port int) *Server {
 }
 
 func main() {
-	port := flag.Int("port", 8080, "listening port number")
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: ./http_server <port>")
+		os.Exit(1)
+	}
+	input, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		fmt.Print(err)
+	}
+	port := flag.Int("port", input, "listening port number")
 	flag.Parse()
 
 	server := NewServer(*port)
@@ -71,7 +81,7 @@ func main() {
 func (c *connection) serve() {
 	defer c.reqConn.Close()
 
-	poachedData, remoteAddr, secure, err := readRequestInfo(c.reqConn)
+	poachedData, remoteAddr, _, err := readRequestInfo(c.reqConn)
 	if err != nil {
 		log.Printf("WARNING: Unable to read request info from %s : %v", c.reqConn.LocalAddr(), err)
 		return
@@ -100,13 +110,12 @@ func (c *connection) serve() {
 			return
 		}
 	}*/
-	
+
 	_, err = remoteConn.Write(poachedData)
 	if err != nil {
 		log.Printf("WARNING: Failed to write request header to remote host! %v", err)
 		return
 	}
-	
 
 	log.Printf("Begin to tunneling connections %s <-> %s", c.reqConn.LocalAddr(), remoteAddr)
 
