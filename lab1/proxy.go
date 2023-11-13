@@ -81,7 +81,7 @@ func main() {
 func (c *connection) serve() {
 	defer c.reqConn.Close()
 
-	poachedData, remoteAddr, err := readRequestInfo(c.reqConn)
+	poachedData, remoteAddr, _, err := readRequestInfo(c.reqConn)
 	if err != nil {
 		log.Printf("WARNING: Unable to read request info from %s : %v", c.reqConn.LocalAddr(), err)
 		return
@@ -127,7 +127,7 @@ func (c *connection) serve() {
 }
 
 // Read request line from `reqConn` and parse it.
-func readRequestInfo(reqConn net.Conn) (poachedData []byte, addr string, err error) {
+func readRequestInfo(reqConn net.Conn) (poachedData []byte, addr string, secureRequest bool, err error) {
 	requestLine, poachedData, err := poachRequestLine(reqConn)
 	if err != nil {
 		log.Printf("WARNING: Failed to read request line from request connection : %v", err)
@@ -144,7 +144,7 @@ func readRequestInfo(reqConn net.Conn) (poachedData []byte, addr string, err err
 	// Drain CONNECT request header, otherwise remaining header data that survived in poaching will cause TLS
 	// handshake to fail.
 	if method == MethodConnect {
-		// secureRequest = true
+		secureRequest = true
 		poachedData, err = drainConnectRequestHeader(reqConn, poachedData)
 		if err != nil {
 			return
@@ -157,16 +157,16 @@ func readRequestInfo(reqConn net.Conn) (poachedData []byte, addr string, err err
 		return
 	}
 
-	// if secureRequest {
-	// 	addr = u.Scheme + ":" + u.Opaque
-	// } else {
-	addr = u.Host
-	if strings.Index(addr, ":") == -1 {
-		addr += ":80"
+	if secureRequest {
+		addr = u.Scheme + ":" + u.Opaque
+	} else {
+		addr = u.Host
+		if strings.Index(addr, ":") == -1 {
+			addr += ":80"
+		}
 	}
-	// }
 
-	return poachedData, addr, nil
+	return poachedData, addr, secureRequest, nil
 }
 
 func poachRequestLine(reqConn net.Conn) (reqLine string, data []byte, err error) {
