@@ -58,7 +58,7 @@ func (srv *Server) handleConnection(conn net.Conn) {
 
 func NewServer(port int) *Server {
 	return &Server{
-		addr: fmt.Sprintf("localhost:%d", port),
+		addr: fmt.Sprintf(":%d", port),
 	}
 }
 
@@ -96,20 +96,6 @@ func (c *connection) serve() {
 	}
 
 	defer remoteConn.Close()
-
-	// If we are going to proxy a https request, we just simply discard `poachedData`, which contains
-	// the entire connect header;
-	// Otherwise, we forward `poachedData` alone with remaining header and body to the remote host.
-
-	/*if secure {
-		c.reqConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-	} else {
-		_, err = remoteConn.Write(poachedData)
-		if err != nil {
-			log.Printf("WARNING: Failed to write request header to remote host! %v", err)
-			return
-		}
-	}*/
 
 	_, err = remoteConn.Write(poachedData)
 	if err != nil {
