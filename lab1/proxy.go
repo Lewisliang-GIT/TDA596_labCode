@@ -1,67 +1,210 @@
 package main
 
 import (
+	"bytes"
+	"errors"
+	"flag"
+	"fmt"
 	"io"
 	"log"
-	"net/http"
+	"net"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
 )
 
-var customTransport = http.DefaultTransport
+const (
+	MethodConnect = "CONNECT"
+)
 
-func init() {
-	// Here, you can customize the transport, e.g., set timeouts or enable/disable keep-alive
+type connection struct {
+	reqConn net.Conn
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-	// Create a new HTTP request with the same method, URL, and body as the original request
-	targetURL := r.URL
-	proxyReq, err := http.NewRequest(r.Method, targetURL.String(), r.Body)
-	if err != nil {
-		http.Error(w, "Error creating proxy request", http.StatusInternalServerError)
-		return
-	}
-
-	// Copy the headers from the original request to the proxy request
-	for name, values := range r.Header {
-		for _, value := range values {
-			proxyReq.Header.Add(name, value)
-		}
-	}
-
-	// Send the proxy request using the custom transport
-	resp, err := customTransport.RoundTrip(proxyReq)
-	if err != nil {
-		http.Error(w, "Error sending proxy request", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Copy the headers from the proxy response to the original response
-	for name, values := range resp.Header {
-		for _, value := range values {
-			w.Header().Add(name, value)
-		}
-	}
-
-	// Set the status code of the original response to the status code of the proxy response
-	w.WriteHeader(resp.StatusCode)
-
-	// Copy the body of the proxy response to the original response
-	io.Copy(w, resp.Body)
+type Server struct {
+	addr     string
+	listener net.Listener
 }
 
-// TODO: make port changeable.
+func (srv *Server) Start() {
+	var err error
+	srv.listener, err = net.Listen("tcp", srv.addr)
+	if err != nil {
+		log.Fatalf("Failed to listen at %s : %v", srv.addr, err)
+	}
+
+	log.Printf("Proxy is listening at %s", srv.addr)
+
+	srv.runLoop()
+}
+
+func (srv *Server) runLoop() {
+	for {
+		conn, err := srv.listener.Accept()
+		if err != nil {
+			log.Printf("Failed to accept an incoming connection : %v", err)
+			continue
+		}
+
+		go srv.handleConnection(conn)
+	}
+}
+
+func (srv *Server) handleConnection(conn net.Conn) {
+	c := newConnection(conn)
+	c.serve()
+}
+
+func NewServer(port int) *Server {
+	return &Server{
+		addr: fmt.Sprintf(":%d", port),
+	}
+}
+
 func main() {
-	// Create a new HTTP server with the handleRequest function as the handler
-	server := http.Server{
-		Addr:    ":8080",
-		Handler: http.HandlerFunc(handleRequest),
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: ./http_server <port>")
+		os.Exit(1)
+	}
+	input, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		fmt.Print(err)
+	}
+	port := flag.Int("port", input, "listening port number")
+	flag.Parse()
+
+	server := NewServer(*port)
+	server.Start()
+}
+
+func (c *connection) serve() {
+	defer c.reqConn.Close()
+
+	poachedData, remoteAddr, _, err := readRequestInfo(c.reqConn)
+	if err != nil {
+		log.Printf("WARNING: Unable to read request info from %s : %v", c.reqConn.LocalAddr(), err)
+		return
 	}
 
-	// Start the server and log any errors
-	log.Println("Starting proxy server on :8080")
-	err := server.ListenAndServe()
+	log.Printf("Establishing connection to %s", remoteAddr)
+
+	remoteConn, err := net.Dial("tcp", remoteAddr)
 	if err != nil {
-		log.Fatal("Error starting proxy server: ", err)
+		log.Printf("WARNING: Failed to connect to host %s : %v", remoteAddr, err)
+		return
+	}
+
+	defer remoteConn.Close()
+
+	_, err = remoteConn.Write(poachedData)
+	if err != nil {
+		log.Printf("WARNING: Failed to write request header to remote host! %v", err)
+		return
+	}
+
+	log.Printf("Begin to tunneling connections %s <-> %s", c.reqConn.LocalAddr(), remoteAddr)
+
+	go io.Copy(remoteConn, c.reqConn)
+
+	io.Copy(c.reqConn, remoteConn)
+
+	log.Print("The tunnel is ended")
+}
+
+// Read request line from `reqConn` and parse it.
+func readRequestInfo(reqConn net.Conn) (poachedData []byte, addr string, secureRequest bool, err error) {
+	requestLine, poachedData, err := poachRequestLine(reqConn)
+	if err != nil {
+		log.Printf("WARNING: Failed to read request line from request connection : %v", err)
+		return
+	}
+
+	// Ignore HTTP version here by now.
+	method, uri, _, ok := parseRequestLine(requestLine)
+	if !ok {
+		err = errors.New("malformed request line")
+		return
+	}
+
+	// Drain CONNECT request header, otherwise remaining header data that survived in poaching will cause TLS
+	// handshake to fail.
+	if method == MethodConnect {
+		secureRequest = true
+		poachedData, err = drainConnectRequestHeader(reqConn, poachedData)
+		if err != nil {
+			return
+		}
+	}
+
+	u, err := url.Parse(uri)
+	if err != nil {
+		log.Printf("WARNING: Failed to parse request uri %s : %v", uri, err)
+		return
+	}
+
+	if secureRequest {
+		addr = u.Scheme + ":" + u.Opaque
+	} else {
+		addr = u.Host
+		if strings.Index(addr, ":") == -1 {
+			addr += ":80"
+		}
+	}
+
+	return poachedData, addr, secureRequest, nil
+}
+
+func poachRequestLine(reqConn net.Conn) (reqLine string, data []byte, err error) {
+	var poachedData []byte
+	buf := make([]byte, 64)
+	for {
+		var bytesRead int
+		bytesRead, err = reqConn.Read(buf)
+		if err != nil {
+			return
+		}
+
+		poachedData = append(poachedData, buf[:bytesRead]...)
+		index := bytes.Index(poachedData, []byte("\r\n"))
+		if index != -1 {
+			reqLine = string(poachedData[:index])
+			break
+		}
+	}
+
+	return reqLine, poachedData, nil
+}
+
+func parseRequestLine(line string) (method, path, ver string, ok bool) {
+	tokens := strings.Split(line, " ")
+	if len(tokens) != 3 {
+		return
+	}
+	return tokens[0], tokens[1], tokens[2], true
+}
+
+func drainConnectRequestHeader(reqConn net.Conn, data []byte) ([]byte, error) {
+	const BufSize = 64
+	for {
+		buf := make([]byte, BufSize)
+		n, err := reqConn.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, buf[:n]...)
+		if n < BufSize || buf[BufSize-1] == byte('\n') {
+			log.Print("Drained https connect request header")
+			break
+		}
+	}
+
+	return data, nil
+}
+
+func newConnection(conn net.Conn) *connection {
+	return &connection{
+		reqConn: conn,
 	}
 }
