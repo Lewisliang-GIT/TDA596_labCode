@@ -4,9 +4,40 @@ Our program is running in go version 1.21.4.
 
 In this lab, we have two code file here.
 
-`http_server.go` is the code of the http server. `proxy.go` is the code of the proxy.
+*http_server.go* is the code of the http server. *proxy.go* is the code of the proxy.
+## Test
+Firstly, we need to assign port to our http_server.go and proxy.go.
 
-## `http_server.go`
+```
+go build -o http_server http_server.go
+go build -o proxy proxy.go
+./http_server <port>
+./proxy <port>
+```
+
+We use command below to test **POST** and **GET** function.  
+For post function:
+```
+curl -X POST <server address>:<port>/filename -F "file=@filename" -x <proxy address>:<port> 
+```
+Example:
+```
+curl -X POST localhost:1234/1.jpeg -F "file=@1.jpeg" -x localhost:9090 
+```
+
+For get function:
+```
+ curl -X GET <server address>:<port>/<file path> -x  <proxy address>:<port> > <output path>
+
+```
+
+Example:
+```
+curl -X GET localhost:1234/uploaded/1.jpeg -x  localhost:9090 >output/3.jpeg
+
+```
+
+## http_server.go
 
 The lab requires us not to use *http.ListenAnd Serve* to deploying the http server. We use *net.Listen* to listen incomming TCP connecting and analyzing what the http request header is. Depending on the require of the incoming http we split two functions. One is handle *'GET'* method and one is used to handle *'POST'* method.
 
@@ -66,17 +97,17 @@ Note that if an error occurs, the function returns early after sending the appro
 
 #### Determining the current type
 
-The function uses `mime.TypeByExtension(path)` to determine the MIME type of the file based on its extension. This is important for the client (usually a web browser) to understand what type of file is being sent.
-If the MIME type cannot be determined, `TypeByExtension` returns an empty string, which could lead the client to make its own determination about the file type.
+The function uses mime.TypeByExtension(path) to determine the MIME type of the file based on its extension. This is important for the client (usually a web browser) to understand what type of file is being sent.
+If the MIME type cannot be determined, TypeByExtension returns an empty string, which could lead the client to make its own determination about the file type.
 
 #### Sending the responce
 
-Finally, if everything is successful, the function sends an `"200 OK"` response along with the content of the file.
+Finally, if everything is successful, the function sends an "200 OK" response along with the content of the file.
 The content type (determined earlier) and the file data are included in the response.
 
 #### Security Consideration
 
-The function assumes that the path provided is safe after running through `isValidPath`. However, it's crucial to ensure that `isValidPath` robustly prevents directory traversal attacks. For instance, a path like `/../secret.txt` should not be allowed.
+The function assumes that the path provided is safe after running through isValidPath. However, it's crucial to ensure that isValidPath robustly prevents directory traversal attacks. For instance, a path like /../secret.txt should not be allowed.
 
 ### `handlePost(conn, request)`
 
@@ -91,10 +122,10 @@ In the funcion of handle the *POST*. Same as `handleGet(conn, request)`, we will
 #### Path valiation
 
 The function checks if the requested path corresponds to an image using isImage.
-If the path is for an image, the function processes a file upload:  
-It retrieves the file from the form-data `(file, _, _ := request.FormFile("file")). Error handling is omitted here (_, _)`, which is risky as it can lead to panics or undefined behavior if the form file isn't present.  
-It creates (or ensures the existence of) a directory named uploaded where the images will be stored.  
-It then opens (or creates) a file in the uploaded directory corresponding to the requested path and writes the uploaded file data to it using `io.Copy`.  
+If the path is for an image, the function processes a file upload:
+It retrieves the file from the form-data (file, _, _ := request.FormFile("file")). Error handling is omitted here (_, _), which is risky as it can lead to panics or undefined behavior if the form file isn't present.
+It creates (or ensures the existence of) a directory named uploaded where the images will be stored.
+It then opens (or creates) a file in the uploaded directory corresponding to the requested path and writes the uploaded file data to it using io.Copy.
 File handles for both the uploaded file and the new file are deferred to close at the end of the function execution.
 
 #### Handling Image Uploads
@@ -116,7 +147,7 @@ The file is saved in the file directory.
 
 #### Response
 
-After processing the upload, the function sends an `"200 OK"` response with a plain text message `"OK\n"`.
+After processing the upload, the function sends an "200 OK" response with a plain text message "OK\n".
 
 ## proxy.go
 
@@ -131,17 +162,17 @@ listener net.Listener
 
 contains the address of the server and a listener.
 
-`start` function:  
-Call `net.Listen` to listen on the specified port and get the listener.  
-Enter the `runLoop` loop.
+`start`function:
+Call `net.Listen` to listen on the specified port and get the listener.
+Enter the runLoop loop.
 
-`runLoop` funtion:  
-Continuously accepts client connections.  
-For each connection, the `handleConnection` method is called to handle the connection.
+`runLoop`funtion:
+Continuously accepts client connections.
+For each connection, the handleConnection method is called to handle the connection.
 
-`handleConnection`function:  
-Create a new connection instance `c`.  
-Call `c.serve()` to handle the connection.
+`handleConnection`function:
+Create a new connection instance c.
+Call c.serve() to handle the connection.
 
 ### Connection struct and functions
 
@@ -151,58 +182,45 @@ reqConn net.Conn
 
 contains a virable of type net.Conn representing the connection.
 
-`serve` function:  
-Call readRequestInfo to read the request information, get the destination address and whether it is a secure request.  
-Send the request header to the target server.  
-Establish a connection to the target server remoteConn.  
+`serve`function:
+Call readRequestInfo to read the request information, get the destination address and whether it is a secure request.
+Send the request header to the target server.
+Establish a connection to the target server remoteConn.
 Start two goroutines, execute io.Copy(remoteConn, c.reqConn) and io.Copy(c.reqConn, remoteConn) respectively for bi-directional data transfer.
 
 ### Other functions
 
-`newConnection` function:  
+`newConnection`function:
 Creates and returns a new connection instance, passing in the connection `conn`.
 
-`NewServer` function:  
+`NewServer`function:
 Creates a new proxy server instance.
 
-`readRequestInfo`:  
-Call poachRequestLine to read the request line and get the remaining data and the request line string.  
-
-Parses the request line to get the request method, path, HTTP version and whether it is a secure request.  
-
+`readRequestInfo`:
+Call poachRequestLine to read the request line and get the remaining data and the request line string.
+Parses the request line to get the request method, path, HTTP version and whether it is a secure request.
 If it is a CONNECT request, call drainConnectRequestHeader to read the CONNECT request header.
 
-`poachRequestLine`:  
-Keep reading the data in the connection until the request line terminator "\r\n" is found.  
-
+`poachRequestLine`:
+Keep reading the data in the connection until the request line terminator "\r\n" is found.
 Returns the request line string and the remaining data.
 
-`parseRequestLine`:  
+`parseRequestLine`:
 Parses the request line string, returning the request method, path, HTTP version, and parsing result.
 
-`drainConnectRequestHeader`:  
-Reads the data in the *CONNECT* request header to ensure that there are no residuals from the TLS handshake.
+`drainConnectRequestHeader`:
+Reads the data in the CONNECT request header to ensure that there are no residuals from the TLS handshake.
 
 ### Main function of proxy.go
 
 ```go
-func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: ./http_server <port>")
-		os.Exit(1)
-	}
-	input, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		fmt.Print(err)
-	}
-	port := flag.Int("port", input, "listening port number")
+port := flag.Int("port", 8080, "listening port number")
 	flag.Parse()
 
 	server := NewServer(*port)
 	server.Start()
-}
 ```
 
-Parses command line arguments for port numbers.  
-Create a proxy server instance.  
-Call `server.Start()` to start the proxy server.
+Parses command line arguments for port numbers.
+Create a proxy server instance, server.
+Call server.Start() to start the proxy server.
