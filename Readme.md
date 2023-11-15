@@ -21,3 +21,7 @@ TODO: make prot number can be set by ourself.
 ## curlpool.sh
 
 To test concurrent requests.
+
+# Lab2
+
+mapreduce
