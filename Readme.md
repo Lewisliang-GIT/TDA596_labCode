@@ -6,17 +6,9 @@
 
 inculding function handle "GET" and "POST" methods.
 
-## ~~http_clinet.go~~
+## proxy.go
 
-~~not in use, just for test~~
-
-## ~~proxy.go~~
-
-use ListenAndServe() which is not allowed in lab.
-
-## proxy_2.go
-
-TODO: make prot number can be set by ourself.
+http proxy.
 
 ## curlpool.sh
 
