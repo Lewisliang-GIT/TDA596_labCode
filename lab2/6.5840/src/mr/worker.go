@@ -43,12 +43,16 @@ func Worker(mapf func(string, string) []KeyValue,
 
 		switch reply.Task.Task {
 		case Map:
+			log.Printf("%v do map", reply.Task.Task)
 			doMap(&reply, mapf)
 		case Reduce:
+			log.Printf("%v do reduce", reply.Task.Task)
 			doReduce(&reply, reducef)
 		case Wait:
+			log.Printf("%v waiting", reply.Task.Task)
 			time.Sleep(1 * time.Second)
 		case Exit:
+			log.Printf("%v exit", reply.Task.Task)
 			os.Exit(0)
 		default:
 			time.Sleep(1 * time.Second)
@@ -64,6 +68,7 @@ func doReduce(reply *RequestTaskReply, reducef func(string, []string) string) {
 	intermediate := []KeyValue{}
 	for m := 0; m < len(reply.Task.InputFiles); m++ {
 		file, err := os.Open(reply.Task.InputFiles[m])
+		log.Printf("%v doing reduce %v", reply.TaskNo, reply.Task.InputFiles)
 		if err != nil {
 			log.Fatalf("cannot open %v", reply.Task.InputFiles[m])
 		}
@@ -127,6 +132,7 @@ func doMap(reply *RequestTaskReply, mapf func(string, string) []KeyValue) {
 		log.Fatalf("cannot read %v", reply.Task.InputFiles[0])
 	}
 	file.Close()
+	log.Printf("%v doing map %v", reply.TaskNo, reply.Task.InputFiles)
 
 	kva := mapf(reply.Task.InputFiles[0], string(content))
 	intermediate := make([][]KeyValue, reply.NReduce)
@@ -145,6 +151,7 @@ func doMap(reply *RequestTaskReply, mapf func(string, string) []KeyValue) {
 		ofile.Close()
 		os.Rename(ofile.Name(), oname)
 	}
+	log.Printf("%v done", reply.TaskNo)
 
 	// Update server state of the task, by calling the RPC NotifyComplete
 	reply.Task.Status = Finished
@@ -183,9 +190,9 @@ func CallExample() {
 // usually returns true.
 // returns false if something goes wrong.
 func call(rpcname string, args interface{}, reply interface{}) bool {
-	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()
-	c, err := rpc.DialHTTP("unix", sockname)
+	c, err := rpc.DialHTTP("tcp", "54.225.11.131"+":1234"+sockname)
+	// c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
