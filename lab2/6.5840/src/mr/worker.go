@@ -83,16 +83,13 @@ func doReduce(reply *RequestTaskReply, reducef func(string, []string) string) {
 		file.Close()
 	}
 
-	// Sort intermediate key-value pairs by key
 	sort.Slice(intermediate, func(i, j int) bool {
 		return intermediate[i].Key < intermediate[j].Key
 	})
 
-	// Create output file
 	oname := fmt.Sprintf("mr-out-%d", reply.Task.Index)
-	ofile, _ := ioutil.TempFile("", oname)
+	ofile, _ := os.Create(oname)
 
-	// Apply reduce function
 	i := 0
 	for i < len(intermediate) {
 		j := i + 1
@@ -108,12 +105,7 @@ func doReduce(reply *RequestTaskReply, reducef func(string, []string) string) {
 		i = j
 	}
 
-	// Close output file
 	ofile.Close()
-
-	// Rename output file
-	os.Rename(ofile.Name(), oname)
-
 	// Update task status
 	reply.Task.Status = Finished
 	replyEx := RequestTaskReply{}
@@ -143,13 +135,12 @@ func doMap(reply *RequestTaskReply, mapf func(string, string) []KeyValue) {
 
 	for r, kva := range intermediate {
 		oname := fmt.Sprintf("mr-%d-%d", reply.Task.Index, r)
-		ofile, _ := ioutil.TempFile("", oname)
+		ofile, _ := os.Create(oname)
 		enc := json.NewEncoder(ofile)
 		for _, kv := range kva {
 			enc.Encode(&kv)
 		}
 		ofile.Close()
-		os.Rename(ofile.Name(), oname)
 	}
 	log.Printf("%v done", reply.TaskNo)
 
@@ -191,8 +182,8 @@ func CallExample() {
 // returns false if something goes wrong.
 func call(rpcname string, args interface{}, reply interface{}) bool {
 	sockname := coordinatorSock()
-	c, err := rpc.DialHTTP("tcp", "54.225.11.131"+":1234"+sockname)
-	// c, err := rpc.DialHTTP("unix", sockname)
+	// c, err := rpc.DialHTTP("tcp", "54.225.11.131"+":1234")
+	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
