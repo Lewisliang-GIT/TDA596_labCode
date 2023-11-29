@@ -17,7 +17,7 @@ inputFiles []string
 	mutex -sync.Mutex
 }
 class MapReduceTask{
-  taskState      taskState
+    Task      Task
 	Status    Status
 	TimeStamp time.Time
 	Index     int
@@ -25,7 +25,7 @@ class MapReduceTask{
 	InputFiles  []string
 	OutputFiles []string
 }
-class taskState{
+class Task{
   Exit 
 	Wait
 	Map
@@ -42,7 +42,7 @@ class RequestTaskReply{
 	NReduce int
 }
 Coordinator *-- MapReduceTask
-MapReduceTask *-- taskState
+MapReduceTask *-- Task
 MapReduceTask *-- Status
 RequestTaskReply *-- MapReduceTask
 ```
