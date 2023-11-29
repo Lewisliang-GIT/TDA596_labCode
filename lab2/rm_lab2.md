@@ -47,7 +47,7 @@ MapReduceTask *-- Status
 RequestTaskReply *-- MapReduceTask
 ```
 
-## uml: state diagram
+## time sequence
 ```mermaid
 sequenceDiagram
 Coordinator ->> Coordinator: MakeCoordinator\n c.server
@@ -63,8 +63,10 @@ else if !c.allMapComplete
     Coordinator ->> Coordinator: allMapDone
 else if c.reduceDone < c.nReduce
     Coordinator ->> Coordinator:c.reducedone++
-else !c.allReduceComplete
+else if !c.allReduceComplete
     Coordinator ->> Coordinator:allreduceDone
+else 
+	Coordinator->>Worker:next task
 end
  Coordinator ->> Coordinator: Done
 ```
