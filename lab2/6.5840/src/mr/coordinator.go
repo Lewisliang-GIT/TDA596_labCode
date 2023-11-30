@@ -1,219 +1,205 @@
 package mr
 
 import (
+	"fmt"
 	"log"
-	"math"
+	"net"
+	"net/http"
+	"net/rpc"
+	"os"
 	"sync"
 	"time"
 )
-import "net"
-import "os"
-import "net/rpc"
-import "net/http"
-
-const Debug = false
-
-func DPrintln(a ...interface{}) (n int, err error) {
-	if Debug {
-		log.Println(a...)
-	}
-	return
-}
-
-func DPrintf(format string, a ...interface{}) (n int, err error) {
-	if Debug {
-		log.Printf(format, a...)
-	}
-	return
-}
 
 type Coordinator struct {
-	// Your definitions here.
-	state   string        // 记录处于哪个阶段
-	nReduce int           // reduce任务数量
-	nMap    int           // map任务数量
-	taskQue chan *Task    // 任务队列
-	taskMap map[int]*Task // 任务列表
-	mu      sync.Mutex    // 锁
-}
+	inputFiles []string
+	nReduce    int
 
-type TaskType string
+	mapTasks    []MapReduceTask
+	reduceTasks []MapReduceTask
 
-const (
-	MAP      = "map"
-	REDUCE   = "reduce"
-	NO_TASK  = "no_task"
-	QUIT     = "quit"
-	TIME_OUT = 10 * time.Second
-)
+	mapDone    int
+	reduceDone int
 
-type Task struct {
-	ID       int
-	Type     TaskType
-	FileName string
-	NReduce  int
-	NMap     int
-	Deadline int64
+	allMapComplete    bool
+	allReduceComplete bool
+
+	mutex sync.Mutex
 }
 
 // Your code here -- RPC handlers for the worker to call.
 
-//
 // an example RPC handler.
 //
 // the RPC argument and reply types are defined in rpc.go.
-//
 func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
 	return nil
 }
 
-//
+func (c *Coordinator) NotifyComplete(arg *RequestTaskReply, reply *RequestTaskReply) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// We will mark the task as complete
+	if arg.Task.Task == Map {
+		c.mapTasks[arg.TaskNo] = arg.Task
+	} else if arg.Task.Task == Reduce {
+		c.reduceTasks[arg.TaskNo] = arg.Task
+	}
+
+	return nil
+}
+
+func (c *Coordinator) RequestTask(args *RequestTaskReply, reply *RequestTaskReply) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// Check if all the map tasks are done
+	if c.mapDone < len(c.inputFiles) {
+		reply.TaskNo = c.mapDone
+		c.mapTasks[c.mapDone].TimeStamp = time.Now()
+		reply.Task = c.mapTasks[c.mapDone]
+		reply.Task.Status = Assigned
+		reply.NReduce = c.nReduce
+
+		c.mapDone++
+		return nil
+	}
+
+	// Before starting with reduce we need to ensure that the all map tasks are completed
+	if !c.allMapComplete {
+		for index, mapTask := range c.mapTasks {
+			if mapTask.Status != Finished {
+				if time.Since(mapTask.TimeStamp) > 10*time.Second {
+					reply.TaskNo = index
+					c.mapTasks[index].TimeStamp = time.Now()
+					reply.Task = c.mapTasks[index]
+					reply.Task.Status = Assigned
+					reply.NReduce = c.nReduce
+					return nil
+				} else {
+					reply.Task.Task = Wait
+					return nil
+				}
+			}
+		}
+		c.allMapComplete = true
+	}
+
+	// Check if all reduce tasks are done
+	if c.reduceDone < c.nReduce {
+		reply.TaskNo = c.reduceDone
+		c.reduceTasks[c.reduceDone].TimeStamp = time.Now()
+		reply.Task = c.reduceTasks[c.reduceDone]
+		reply.Task.Status = Assigned
+		reply.NReduce = c.nReduce
+
+		c.reduceDone++
+		return nil
+	}
+
+	// Check if all the reduce tasks are completed
+	if !c.allReduceComplete {
+		for index, reduceTask := range c.reduceTasks {
+			if reduceTask.Status != Finished {
+				if time.Since(reduceTask.TimeStamp) > 10*time.Second {
+					reply.TaskNo = index
+					c.reduceTasks[index].TimeStamp = time.Now()
+					reply.Task = c.reduceTasks[index]
+					reply.Task.Status = Assigned
+					reply.NReduce = c.nReduce
+
+					return nil
+				} else {
+					reply.Task.Task = Wait
+					return nil
+				}
+			}
+		}
+		c.allReduceComplete = true
+	}
+
+	reply.Task.Status = Status(Exit)
+	return nil
+}
+
 // start a thread that listens for RPCs from worker.go
-//
 func (c *Coordinator) server() {
 	rpc.Register(c)
 	rpc.HandleHTTP()
-	//l, e := net.Listen("tcp", ":1234")
 	sockname := coordinatorSock()
 	os.Remove(sockname)
-	l, e := net.Listen("unix", sockname)
+	l, e := net.Listen("tcp", ":1234")
+	// l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
 	go http.Serve(l, nil)
 }
 
-//
 // main/mrcoordinator.go calls Done() periodically to find out
 // if the entire job has finished.
-//
 func (c *Coordinator) Done() bool {
-	ret := false
+	// ret := false
 	// Your code here.
-	c.mu.Lock()
-	ret = c.state == QUIT
-	c.mu.Unlock()
-	return ret
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return c.allMapComplete && c.allReduceComplete
 }
 
-//
 // create a Coordinator.
 // main/mrcoordinator.go calls this function.
 // nReduce is the number of reduce tasks to use.
-//
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
-	c := Coordinator{}
+	c := Coordinator{
+		inputFiles:  files,
+		nReduce:     nReduce,
+		mapTasks:    make([]MapReduceTask, len(files)),
+		reduceTasks: make([]MapReduceTask, nReduce),
+		mapDone:     0,
+		reduceDone:  0,
+		mutex:       sync.Mutex{},
 
-	// Your code here.
-	c.nReduce = nReduce
-	c.nMap = len(files)
-	c.taskQue = make(chan *Task, int(math.Max(float64(len(files)), float64(nReduce))))
-	c.taskMap = make(map[int]*Task)
-	c.mu = sync.Mutex{}
-	c.state = MAP
-
-	for i, filename := range files {
-		// 创建MapTask
-		task := Task{
-			ID:       i,
-			Type:     MAP,
-			FileName: filename,
-			NReduce:  c.nReduce,
-			NMap:     c.nMap,
-			Deadline: -1,
-		}
-		c.taskQue <- &task
-		c.taskMap[i] = &task
+		allMapComplete:    false,
+		allReduceComplete: false,
 	}
-	go c.detector()
+
+	// Initialize mapTasks
+	for i := range c.mapTasks {
+		c.mapTasks[i] = MapReduceTask{
+			Task:        Map,
+			Status:      Unassigned,
+			TimeStamp:   time.Now(),
+			Index:       i,
+			InputFiles:  []string{files[i]}, // Assign input file for map task
+			OutputFiles: nil,                // Output files will be generated after the map task is completed
+		}
+	}
+
+	// Initialize reduceTasks
+	for i := range c.reduceTasks {
+		c.reduceTasks[i] = MapReduceTask{
+			Task:        Reduce,
+			Status:      Unassigned,
+			TimeStamp:   time.Now(),
+			Index:       i,
+			InputFiles:  generateInputFiles(i, len(files)),     // Input files will be generated by map tasks
+			OutputFiles: []string{fmt.Sprintf("mr-out-%d", i)}, // Output file for reduce task
+		}
+	}
 
 	c.server()
+	log.Printf("coordinator server")
 	return &c
 }
 
-func (c *Coordinator) detector() {
-	for {
-		c.mu.Lock()
-		DPrintln("current task number ", len(c.taskMap))
-		if len(c.taskMap) == 0 {
-			c.changeState()
-		} else {
-			c.taskTimeout()
-		}
-		c.mu.Unlock()
+func generateInputFiles(i int, file int) []string {
+	var inputFiles []string
 
-		time.Sleep(100 * time.Millisecond)
+	for j := 0; j < file; j++ {
+		inputFiles = append(inputFiles, fmt.Sprintf("mr-%d-%d", j, i))
 	}
-}
 
-func (c *Coordinator) taskTimeout() {
-	for _, task := range c.taskMap {
-		DPrintln(time.Now().Unix(), " ", task.Deadline)
-		if (task.Deadline != -1) && (time.Now().Unix() > task.Deadline) {
-			// 任务超时
-			task.Deadline = -1
-			c.taskQue <- task
-			DPrintln(task)
-		}
-	}
-}
-
-func (c *Coordinator) changeState() {
-	if c.state == MAP {
-		// MAP阶段转换为REDUCE阶段 生成reduce任务
-		c.state = REDUCE
-		c.taskMap = make(map[int]*Task)
-		for i := 0; i < c.nReduce; i++ {
-			// 创建MapTask
-			task := Task{
-				ID:       i,
-				Type:     REDUCE,
-				NReduce:  c.nReduce,
-				NMap:     c.nMap,
-				Deadline: -1,
-			}
-			c.taskQue <- &task
-			c.taskMap[i] = &task
-		}
-		DPrintln("map =======> reduce")
-	} else if c.state == REDUCE {
-		c.state = QUIT
-		DPrintln("reduce =======> quit")
-		for i := 0; i < c.nReduce; i++ {
-			// 创建MapTask
-			task := Task{
-				ID:       i,
-				Type:     QUIT,
-				NReduce:  c.nReduce,
-				NMap:     c.nMap,
-				Deadline: -1,
-			}
-			c.taskQue <- &task
-			c.taskMap[i] = &task
-		}
-	} else if c.state == QUIT {
-		log.Println("coordinator exit")
-		os.Exit(0)
-	}
-}
-
-func (c *Coordinator) RequestTask(args *RequestTaskArgs, reply *RequestTaskReply) error {
-	if len(c.taskMap) != 0 {
-		task := <-c.taskQue
-		task.Deadline = time.Now().Add(TIME_OUT).Unix()
-		reply.Task = *task
-	} else {
-		reply.Task = Task{Type: NO_TASK}
-	}
-	return nil
-}
-
-func (c *Coordinator) TaskDone(args *TaskDoneArgs, reply *TaskDoneReply) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	DPrintln("delete task ", args.ID)
-	delete(c.taskMap, args.ID)
-
-	return nil
+	return inputFiles
 }
