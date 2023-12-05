@@ -4,11 +4,11 @@ import "math/big"
 
 // fingerEntry represents a single finger table entry
 type fingerEntry struct {
-	Id   []byte // ID hash of (n + 2^i) mod (2^m)
-	Node *Node
+	Id        string // ID hash of (n + 2^i) mod (2^m)
+	Successor *Node
 }
 
-type fingerTable []fingerEntry
+//type fingerTable []*fingerEntry
 
 func newFingerTable(node *Node, m int) fingerTable {
 	ft := make([]*fingerEntry, m)

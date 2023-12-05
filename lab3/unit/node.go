@@ -2,9 +2,13 @@ package unit
 
 import (
 	"crypto/sha1"
+	"log"
 	"math/big"
+	"net"
 	"sync"
 )
+
+var m int// -r <Number> = The number of successors maintained by the Chord client. Represented as a base-10 integer. Must be specified, with a value in the range of [1,32].
 
 type Key string
 
@@ -12,12 +16,39 @@ type NodeAddress string
 
 type Node struct {
 	Address     NodeAddress
-	FingerTable []NodeAddress
+	FingerTable []*fingerEntry
 	Predecessor NodeAddress
-	Successors  []NodeAddress
+	Successors  []*Node
 
 	Bucket map[Key]string
 	Mutex  sync.Mutex
+}
+
+func (node *Node)creatChord{
+	log.Printf("Craeting chord")
+	node.Predecessor = ""
+	node.FingerTable=new([keySize + 2]*fingerEntry)[1:(keySize + 1)]
+	for i := 0; i < keySize; i++ {
+		node.FingerTable[i] = &fingerEntry{}
+		node.FingerTable[i].Id = jump(string(node.Address), i+1).String()
+		node.FingerTable[i].Successor = node
+	}
+	node.Successors= make([]*Node, keySize)
+	for i := 0; i < keySize; i++ {
+		node.Successors[i] = node.FingerTable[i].Successor
+	}
+}
+
+func getLocalAddress() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }
 
 func hashString(elt string) *big.Int {
@@ -75,31 +106,10 @@ else
 report error;
 
 func (n *Node) join(joinNode *Node) error {
-
-	// First check if node already present in the circle
-	// Join this node to the same chord ring as parent
-	var foo *Node
-
-	// Ask if our id already exists on the ring.
-	if joinNode != nil {
-		remoteNode, err := n.findSuccessorRPC(joinNode, n.Address)
-		if err != nil {
-			return err
-		}
-		if isEqual(remoteNode.Address, n.Address) {
-			return ERR_NODE_EXISTS
-		}
-		foo = joinNode
-	} else {
-		foo = n
+	log.Printf("node join")
+	n.Predecessor = ""
+	n.Successors= make([]NodeAddress, m)
+	for i := 0; i < m; i++ {
+		n.Successors[i] = n.Address
 	}
-
-	succ, err := n.findSuccessorRPC(foo, n.Address)
-	if err != nil {
-		return err
-	}
-	n.Mutex.Lock()
-	n.successor = succ
-	n.Mutex.Unlock()
-	return nil
 }
