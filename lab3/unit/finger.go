@@ -2,14 +2,6 @@ package unit
 
 import "math/big"
 
-// fingerEntry represents a single finger table entry
-type fingerEntry struct {
-	Id        *big.Int // ID hash of (n + 2^i) mod (2^m)
-	Successor *Node
-}
-
-//type fingerTable []*fingerEntry
-
 func newFingerTable(node *Node, m int) []*fingerEntry {
 	ft := make([]*fingerEntry, m)
 	for i := range ft {
@@ -50,6 +42,11 @@ func fingerID(n *big.Int, i int, m int) *big.Int {
 	return idInt
 }
 
-func (node *Node) fixFingers() {
-
+func fixFingers(node *Node, m int) {
+	for i := 0; i < m; i++ {
+		var aId = fingerID(node.Id, i, m)
+		findNode := node.find(aId, node)
+		node.FingerTable[i].Successor = findNode
+		node.FingerTable[i].Id = findNode.Id
+	}
 }

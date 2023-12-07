@@ -5,36 +5,18 @@ import (
 	"log"
 	"math/big"
 	"net"
-	"sync"
 )
 
-var m int// -r <Number> = The number of successors maintained by the Chord client. Represented as a base-10 integer. Must be specified, with a value in the range of [1,32].
-
-type Key string
-
-type NodeAddress string
-
-type Node struct {
-	Id          *big.Int
-	Address     NodeAddress
-	FingerTable []*fingerEntry
-	Predecessor NodeAddress
-	Successors  []*Node
-
-	Bucket map[Key]string
-	//Mutex  sync.Mutex
-}
-
-func (node *Node)creatChord{
+func (node *Node) creatChord() {
 	log.Printf("Craeting chord node %v", node)
-	node.Predecessor = ""
-	node.FingerTable=new([keySize + 2]*fingerEntry)[1:(keySize + 1)]
+	node.Predecessor = nil
+	node.FingerTable = newFingerTable(node, m)
 	for i := 0; i < keySize; i++ {
 		node.FingerTable[i] = &fingerEntry{}
 		node.FingerTable[i].Id = jump(node.Id.String(), i+1)
 		node.FingerTable[i].Successor = node
 	}
-	node.Successors= make([]*Node, keySize)
+	node.Successors = make([]*Node, keySize)
 	for i := 0; i < keySize; i++ {
 		node.Successors[i] = node.FingerTable[i].Successor
 	}
@@ -46,7 +28,12 @@ func getLocalAddress() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(conn)
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
@@ -59,10 +46,13 @@ func hashString(elt string) *big.Int {
 	return new(big.Int).SetBytes(hasher.Sum(nil))
 }
 
-const keySize = sha1.Size * 8
-
-var two = big.NewInt(2)
-var hashMod = new(big.Int).Exp(big.NewInt(2), big.NewInt(keySize), nil)
+func between(start, elt, end *big.Int, inclusive bool) bool {
+	if end.Cmp(start) > 0 {
+		return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
+	} else {
+		return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
+	}
+}
 
 func jump(address string, fingerentry int) *big.Int {
 	n := hashString(address)
@@ -73,14 +63,6 @@ func jump(address string, fingerentry int) *big.Int {
 	return new(big.Int).Mod(sum, hashMod)
 }
 
-func between(start, elt, end *big.Int, inclusive bool) bool {
-	if end.Cmp(start) > 0 {
-		return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
-	} else {
-		return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
-	}
-}
-
 /*
 n.find_successor(id)
 if (id ∈ (n, successor])
@@ -88,11 +70,11 @@ return true, successor;
 else
 return false, closest_preceding_node(id);
 */
-func (node *Node)findSuccessor(id *big.Int) (bool,*Node) {
-	if between(node.Id,id,node.Successors[0].Id,true){
-		return true,node.Successors[0]
+func (node *Node) findSuccessor(id *big.Int) (bool, *Node) {
+	if between(node.Id, id, node.Successors[0].Id, true) {
+		return true, node.Successors[0]
 	}
-	return false,node.closestPrecedingNode(id)
+	return false, node.closestPrecedingNode(id)
 }
 
 /*
@@ -104,9 +86,9 @@ if (finger[i] ∈ (n,id])
 return finger[i];
 return successor;
 */
-func (node *Node)closestPrecedingNode(id *big.Int) *Node{
+func (node *Node) closestPrecedingNode(id *big.Int) *Node {
 	for i := m; i > 1; i-- {
-		if between(node.Id,node.FingerTable[i].Id,id,true){
+		if between(node.Id, node.FingerTable[i].Id, id, true) {
 			return node.FingerTable[i].Successor
 		}
 	}
@@ -126,13 +108,13 @@ return nextNode;
 else
 report error;
 */
-func (node *Node)find(id *big.Int,startNode *Node) *Node{
-	var nextNode=startNode
+func (node *Node) find(id *big.Int, startNode *Node) *Node {
+	var nextNode = startNode
 	var found bool
-	var maxStep = keySize-1
-	for i:=0;i<maxStep;i++ {
-		found,nextNode=nextNode.findSuccessor(id)
-		if found==true{
+	var maxStep = keySize - 1
+	for i := 0; i < maxStep; i++ {
+		found, nextNode = nextNode.findSuccessor(id)
+		if found == true {
 			return nextNode
 		}
 	}
@@ -152,25 +134,26 @@ func (node *Node) join(joinNode *Node) error {
 		node.Successors[0] = found
 	}
 
-	node.Bucket = node.get_all()
-	node.FingerTable = new([keySize + 2]*fingerEntry)[1:(keySize + 1)]
+	//node.Bucket = node.get_all()
+	node.FingerTable = newFingerTable(node, m)
 	for i := 0; i < keySize; i++ {
 		node.FingerTable[i] = &fingerEntry{}
-		node.FingerTable[i].Id = jump(string(node.Address), i+1).String()
-		node.FingerTable[i].Successor = node.Successor[0]
+		node.FingerTable[i].Id = jump(string(node.Address), i+1)
+		node.FingerTable[i].Successor = node.Successors[0]
 	}
 
 	/* Activate Background Processes*/
 	node.stabilize()
 	notify(joinNode)
-	node.fixFingers()
+	fixFingers(node, m)
+	return nil
 }
 
-func (node *Node)stabilize()  {
+func (node *Node) stabilize() {
 
 }
 
-func notify(node *Node)  {
+func notify(node *Node) {
 
 }
 

@@ -18,7 +18,3 @@ func main() {
 	node := Node{Id: id, Address: NodeAddress(address)}
 	node.creatChord()
 }
-
-func call(address string, method string, request interface{}, reply interface{}) error {
-	return nil
-}
