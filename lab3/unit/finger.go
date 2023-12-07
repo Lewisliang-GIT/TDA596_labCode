@@ -4,13 +4,13 @@ import "math/big"
 
 // fingerEntry represents a single finger table entry
 type fingerEntry struct {
-	Id        string // ID hash of (n + 2^i) mod (2^m)
+	Id        *big.Int // ID hash of (n + 2^i) mod (2^m)
 	Successor *Node
 }
 
 //type fingerTable []*fingerEntry
 
-func newFingerTable(node *Node, m int) fingerTable {
+func newFingerTable(node *Node, m int) []*fingerEntry {
 	ft := make([]*fingerEntry, m)
 	for i := range ft {
 		ft[i] = newFingerEntry(fingerID(node.Id, i, m), node)
@@ -19,17 +19,17 @@ func newFingerTable(node *Node, m int) fingerTable {
 }
 
 // newFingerEntry returns an allocated new finger entry with the attributes set
-func newFingerEntry(id []byte, node *Node) *fingerEntry {
+func newFingerEntry(id *big.Int, node *Node) *fingerEntry {
 	return &fingerEntry{
-		Id:   id,
-		Node: node,
+		Id:        id,
+		Successor: node,
 	}
 }
 
 // Computes the offset by (n + 2^i) mod (2^m)
-func fingerID(n []byte, i int, m int) []byte {
+func fingerID(n *big.Int, i int, m int) *big.Int {
 	// Convert the ID to a bigint
-	idInt := (&big.Int{}).SetBytes(n)
+	idInt := n
 
 	// Get the offset
 	two := big.NewInt(2)
@@ -47,5 +47,9 @@ func fingerID(n []byte, i int, m int) []byte {
 	// Apply the mod
 	idInt.Mod(&sum, &ceil)
 	// Add together
-	return idInt.Bytes()
+	return idInt
+}
+
+func (node *Node) fixFingers() {
+
 }
