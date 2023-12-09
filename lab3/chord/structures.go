@@ -1,13 +1,13 @@
-package unit
+package chord
 
 import (
 	"crypto/sha1"
 	"math/big"
 )
 
-var m int // -r <Number> = The number of successors maintained by the Chord client. Represented as a base-10 integer. Must be specified, with a value in the range of [1,32].
+var m int = 3 // -r <Number> = The number of successors maintained by the Chord client. Represented as a base-10 integer. Must be specified, with a value in the range of [1,32].
 
-type Key string
+//type Key *big.Int
 
 type NodeAddress string
 
@@ -18,7 +18,7 @@ type Node struct {
 	Predecessor *Node
 	Successors  []*Node
 
-	Bucket map[Key]string
+	Bucket map[*big.Int]string
 	//Mutex  sync.Mutex
 }
 
@@ -30,6 +30,12 @@ type ChordRing struct {
 type fingerEntry struct {
 	Id        *big.Int // ID hash of (n + 2^i) mod (2^m)
 	Successor *Node
+}
+
+type File struct {
+	FileId  *big.Int
+	Name    string
+	Content []byte
 }
 
 //type fingerTable []*fingerEntry

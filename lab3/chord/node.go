@@ -1,4 +1,4 @@
-package unit
+package chord
 
 import (
 	"crypto/sha1"
@@ -7,12 +7,12 @@ import (
 	"net"
 )
 
-func (node *Node) creatChord() {
+func (node *Node) CreatChord() {
 	log.Printf("Craeting chord node %v", node)
 	node.Predecessor = nil
 	node.FingerTable = newFingerTable(node, m)
 	for i := 0; i < keySize; i++ {
-		node.FingerTable[i] = &fingerEntry{}
+		node.FingerTable[i] = newFingerEntry(big.NewInt(int64(i)), node)
 		node.FingerTable[i].Id = jump(node.Id.String(), i+1)
 		node.FingerTable[i].Successor = node
 	}
@@ -20,7 +20,7 @@ func (node *Node) creatChord() {
 	for i := 0; i < keySize; i++ {
 		node.Successors[i] = node.FingerTable[i].Successor
 	}
-	node.Bucket = make(map[Key]string)
+	node.Bucket = make(map[*big.Int]string)
 }
 
 func getLocalAddress() string {
@@ -40,7 +40,7 @@ func getLocalAddress() string {
 	return localAddr.IP.String()
 }
 
-func hashString(elt string) *big.Int {
+func HashString(elt string) *big.Int {
 	hasher := sha1.New()
 	hasher.Write([]byte(elt))
 	return new(big.Int).SetBytes(hasher.Sum(nil))
@@ -55,7 +55,7 @@ func between(start, elt, end *big.Int, inclusive bool) bool {
 }
 
 func jump(address string, fingerentry int) *big.Int {
-	n := hashString(address)
+	n := HashString(address)
 	fingerentryminus1 := big.NewInt(int64(fingerentry) - 1)
 	jump := new(big.Int).Exp(two, fingerentryminus1, nil)
 	sum := new(big.Int).Add(n, jump)
