@@ -19,14 +19,14 @@ func init() {
 	debug = false
 	var err error
 	// logf, err := os.OpenFile("./logs.txt", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0664)
-	logf, err := os.OpenFile("./logs.txt", os.O_CREATE|os.O_TRUNC|os.O_RDONLY, 0664)
+	logf, err := os.OpenFile("./logs.txt", os.O_CREATE|os.O_TRUNC|os.O_RDONLY, 0777)
 	if err != nil {
 		log.Panicln("Crash in Log file init")
 	}
 	Logger = log.New(logf, ">>> ", log.Ltime)
 }
 
-// local address
+// GetAddress local address
 func GetAddress() string {
 	var address string
 	interfaces, err := net.Interfaces()
@@ -106,7 +106,7 @@ func (s *Server) Listen() error {
 		Logger.Println("listen at ", ":"+s.node.Port)
 	}
 
-	s.node.create()
+	s.node.Create()
 	s.listener = ler
 	s.node.Listening = true
 
@@ -120,7 +120,7 @@ func (s *Server) Join(address string) error {
 	if err := s.Listen(); err != nil {
 		return err
 	}
-	return s.node.join(address)
+	return s.node.Join(address)
 }
 
 // for a server, it means unlisten

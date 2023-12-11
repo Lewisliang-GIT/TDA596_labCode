@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"lab3_backup/chord"
@@ -14,18 +15,75 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	//"github.com/color"
 )
 
 var (
 	buffer bytes.Buffer
 )
+var node chord.Node
+var Cmd command
+var err error
 
 func init() {
 
 }
 func main() {
-	main3()
+	fmt.Printf("--------------------- <%s> ---------------------\n", 888)
+	commandlineFlags()
+	for {
+		c := &Cmd
+
+		line, _ := getline(os.Stdin)
+
+		cnt := 0
+		switch line[0] {
+		case "create":
+			err = c.Create(line[1:]...)
+			cnt++
+		case "port":
+			port := rand.Int31()%50 + 8000
+			if len(line) == 1 {
+				err = c.Port(strconv.FormatInt(int64(port), 10))
+			} else {
+				err = c.Port(line[1:]...)
+			}
+		case "quit":
+			err = c.Quit(line[1:]...)
+			os.Exit(1)
+		case "join":
+			err = c.Join(line[1:]...)
+			cnt++
+		case "put":
+			err = c.Put(line[1:]...)
+		case "get":
+			err = c.Get(line[1:]...)
+		case "del":
+			err = c.Del(line[1:]...)
+		case "backup":
+			err = c.Backup(line[1:]...)
+		case "recover":
+			err = c.Recover(line[1:]...)
+		case "dump":
+			err = c.Dump(line[1:]...)
+		case "putrandom":
+			c.Random(line[1:]...)
+		case "remove": //|| line[0] == "clear" {
+			c.Remove(line[1:]...)
+		default:
+			if line[0] == "help" {
+				err = c.Help(line[1:]...)
+			} else {
+				err = c.Help(line[0:]...)
+			}
+		}
+
+		if err != nil {
+			log.Println(err)
+		}
+		if s, e := buffer.ReadString('\n'); e == nil {
+			log.Print(s)
+		}
+	}
 }
 
 type errType struct {
@@ -37,242 +95,6 @@ type errType struct {
 }
 
 type sl []*big.Int
-
-func main1() {
-	x := make(sl, 30, 30)
-	j := 0
-	for i := 0; i <= 11; i++ {
-		x[j] = chord.Hash("10.163.174.211:800" + strconv.FormatInt(int64(i), 10))
-		j++
-		fmt.Printf("%d\t%d\n", i, x[j])
-		x[j] = chord.Hash(strconv.FormatInt(int64(i), 10))
-		fmt.Printf("%d:\t%d\n", i, x[j])
-		j++
-	}
-	// sort.Sort(x)
-}
-
-func main2() {
-	var ports [105]string
-	datas := map[string]string{}
-	var dataString [2005]string
-	Cmd := make([]command, 100, 100)
-
-	r := rand.New(rand.NewSource(0))
-	// r := rand.New(rand.NewSource(time.Now().Unix()))
-	//green := color.New(color.FgGreen) //.Add(color.Underline)
-	//red := color.New(color.FgRed)
-	//blue := color.New(color.FgBlue)
-
-	for i := 0; i <= 100; i++ {
-		ports[i] = strconv.FormatInt(int64(i+6000), 10)
-	}
-
-	for i := 0; i <= 2000; i++ {
-		dataString[i] = strconv.FormatInt(r.Int63(), 10)
-		datas[dataString[i]] = strconv.FormatInt(int64(i), 10)
-	}
-
-	cnt := -1   //stack top of porgram
-	d_cnt := -1 //stack top of data
-	var flag bool
-	errs := make([]errType, 0, 300)
-
-	cnt++
-	cur := &Cmd[cnt]
-	cur.Port(ports[0])
-	cur.Create()
-
-	// fmt.Printf("%d\n%d\n%d", dht.Hash("10.163.174.211:8005"), dht.Hash("2"), dht.Hash("10.163.174.211:8010"))
-	for i := 1; i <= 5; i++ {
-		for j := 1; j <= 15; j++ {
-			cnt++
-			cur = &Cmd[cnt]
-			cur.Port(ports[cnt])
-			// if ports[cnt] == "8006" {
-			// 	red.Println("here it is")
-			// 	for j := 0; j <= cnt; j++ {
-			// 		Cmd[j].Dump()
-			// 	}
-
-			// }
-			if err := cur.Join(Cmd[0].node.Address); err != nil {
-				fmt.Println(err)
-			}
-
-			log.Println("Join  ", cnt)
-			time.Sleep(1000 * time.Millisecond) // 1000+
-		}
-		time.Sleep(4000 * time.Millisecond) // 5000+
-
-		//put
-		flag = true
-		errs = errs[0:0]
-		for j := 1; j <= 300; j++ {
-			// c := r.Int() % (cnt + 1)
-			c := 0
-			d_cnt++
-			s := dataString[d_cnt]
-			Cmd[c].Put(s, datas[s])
-
-			if ans, _ := buffer.ReadString('\n'); ans != "true\n" {
-				fmt.Printf("%s is %d\n", s, chord.Hash(s))
-				errs = append(errs, errType{j, Cmd[c].node.Address, s, datas[s]})
-				flag = false
-			}
-		}
-		if flag {
-			log.Println("Pass First ", i)
-		} else {
-			log.Println("Errors(1) are:")
-			for _, j := range errs {
-				log.Println(j)
-			}
-		}
-
-		//get
-		flag = true
-		errs = errs[0:0]
-		for j := 1; j <= 200; j++ {
-			// c := r.Int() % (cnt + 1)
-			c := 0
-			s := dataString[r.Int()%d_cnt]
-			Cmd[c].Get(s)
-			if ans, _ := buffer.ReadString('\n'); ans != datas[s]+"\n" {
-				fmt.Printf("Get(%s) hash:%d\n", s, chord.Hash(s))
-				// fmt.Printf("%s is %d\n", s, dht.Hash(s))
-				errs = append(errs, errType{j, Cmd[c].node.Address, s, datas[s]})
-				flag = false
-			}
-		}
-		if flag {
-			log.Println("Pass Second ", i)
-		} else {
-			log.Println("Errors(2) are:")
-			for _, j := range errs {
-				log.Println(j)
-			}
-			// for j := 0; j <= cnt; j++ {
-			// 	Cmd[j].Dump()
-			// }
-			// fmt.Println("\n")
-		}
-
-		//del
-		flag = true
-		errs = errs[0:0]
-		for j := 1; j <= 150; j++ {
-			// c := r.Int() % (cnt + 1)
-			c := 0
-			s := dataString[d_cnt]
-			d_cnt--
-			Cmd[c].Del(s)
-
-			if ans, _ := buffer.ReadString('\n'); ans != "true\n" {
-				fmt.Printf("Del(%s) hash:%d\n", s, chord.Hash(s))
-				errs = append(errs, errType{j, Cmd[c].node.Address, s, datas[s]})
-				flag = false
-			}
-		}
-		if flag {
-			log.Println("Pass Third ", i)
-		} else {
-			log.Println("Errors(3) are:")
-			for _, j := range errs {
-				fmt.Println("Get hash:", j.k)
-				log.Println(j)
-			}
-			// for j := 0; j <= cnt; j++ {
-			// 	Cmd[j].Dump()
-			// }
-		}
-
-		for j := 1; j <= 5; j++ {
-			cur = &Cmd[cnt]
-			cnt--
-			if err := cur.Quit(); err != nil {
-				fmt.Println(err)
-			}
-			log.Println("Quit ", cnt+1)
-			time.Sleep(1000 * time.Millisecond) // 1000+
-		}
-		time.Sleep(4000 * time.Millisecond)
-		// Cmd[3].Dump()
-
-		//put
-		flag = true
-		errs = errs[0:0]
-		for j := 1; j <= 300; j++ {
-			c := r.Int() % (cnt + 1)
-			d_cnt++
-			s := dataString[d_cnt]
-			Cmd[c].Put(s, datas[s])
-			datas[s] = strconv.FormatInt(int64(d_cnt), 10)
-			if ans, _ := buffer.ReadString('\n'); ans != "true\n" {
-				fmt.Printf("%s is %d\n", s, chord.Hash(s))
-				errs = append(errs, errType{j, Cmd[c].node.Address, s, datas[s]})
-				flag = false
-			}
-		}
-		if flag {
-			log.Println("Pass First ", i)
-		} else {
-			log.Println("Errors(1) are:")
-			for _, j := range errs {
-				log.Println(j)
-			}
-		}
-
-		//get
-		flag = true
-		errs = errs[0:0]
-		for j := 1; j <= 200; j++ {
-			c := r.Int() % (cnt + 1)
-			s := dataString[r.Int()%d_cnt]
-			Cmd[c].Get(s)
-			if ans, _ := buffer.ReadString('\n'); ans != datas[s]+"\n" {
-				fmt.Printf("Get(%s) hash:%d\n", s, chord.Hash(s))
-				errs = append(errs, errType{j, Cmd[c].node.Address, s, datas[s]})
-				flag = false
-			}
-		}
-		if flag {
-			log.Println("Pass Second ", i)
-		} else {
-			log.Println("Errors(2) are:")
-			for _, j := range errs {
-				log.Println(j)
-			}
-		}
-
-		//del
-		flag = true
-		errs = errs[0:0]
-		for j := 1; j <= 150; j++ {
-			c := r.Int() % (cnt + 1)
-			s := dataString[d_cnt]
-			d_cnt--
-			Cmd[c].Del(s)
-
-			if ans, _ := buffer.ReadString('\n'); ans != "true\n" {
-				fmt.Printf("Del(%s) hash:%d\n", s, chord.Hash(s))
-				errs = append(errs, errType{j, Cmd[c].node.Address, s, datas[s]})
-				flag = false
-			}
-		}
-		if flag {
-			log.Println("Pass Third ", i)
-		} else {
-			log.Println("Errors(3) are:")
-			for _, j := range errs {
-				fmt.Println("Get hash:", j.k)
-				log.Println(j)
-			}
-		}
-	}
-	log.Println(cnt, d_cnt+1)
-
-}
 
 func getline(reader io.Reader) ([]string, error) {
 	//reader := bufio.NewReader(os.Stdin)
@@ -315,10 +137,6 @@ func getline(reader io.Reader) ([]string, error) {
 func main3() {
 	//green := color.New(color.FgGreen)
 	//red := color.New(color.FgRed)
-
-	t := time.Now()
-	log.Printf("@CopyRight(c) 2018 Xun. All rights reserved\n--At %v DHT begins--\n", t.Round(time.Second).Format(layout))
-
 	var Cmd command
 	cnt := 0
 	// rand.Seed(time.Now().Unix())
@@ -403,3 +221,75 @@ func main3() {
 // struct cmd:::
 
 //operator domains
+
+func commandlineFlags() {
+	c := &Cmd
+	ip1 := flag.String("a", "", "The IP address that the Chord client will bind to")
+	port1 := flag.String("p", "", "The port that the Chord client will bind to and listen on")
+	ip2 := flag.String("ja", "", "The IP address of the machine running a Chord node")
+	port2 := flag.String("jp", "", "The port that an existing Chord node is bound to and listening on")
+	delay1 := flag.Int("ts", 30000, "The time in milliseconds between invocations of ‘stabilize")
+	delay2 := flag.Int("tff", 10000, "The time in milliseconds between invocations of ‘fix fingers’")
+	delay3 := flag.Int("tcp", 40000, "The time in milliseconds between invocations of ‘check predecessor")
+	delay4 := flag.Int("s", 1, "The time in minutes between invocations of ‘backupHandler")
+	nbrSuccesors := flag.Int("r", 3, "The number of successors maintained by the Chord client")
+	idOverwrite := flag.String("i", "", "The identifier (ID) assigned to the Chord client which will"+
+		" override the ID computed by the SHA1 sum of the client’s IP address and port number")
+	debuggingOn := flag.Bool("d", false, "The switch for debugging print")
+
+	flag.Parse()
+
+	if *ip1 == "" {
+		fmt.Println("Local Node IP hasn't been set\n<Setting to default (localhost IP)>")
+		*ip1 = chord.GetAddress()
+	}
+	if *port1 == "" {
+		fmt.Println("Local Node Port hasn't been set\n<Setting to default (8080)>")
+		*port1 = "8080"
+	}
+
+	c.debug = *debuggingOn
+	if *delay1 > 60000 || *delay1 < 1 {
+		*delay1 = 30000
+	}
+	if *delay2 > 60000 || *delay2 < 1 {
+		*delay2 = 10000
+	}
+	if *delay3 > 60000 || *delay3 < 1 {
+		*delay3 = 40000
+	}
+	if *delay4 > 10080 || *delay4 < 1 {
+		*delay4 = 1
+	}
+	if *nbrSuccesors > 32 || *nbrSuccesors < 1 {
+		*nbrSuccesors = 3
+	}
+	chord.RefreshTime = time.Duration(*delay1)
+	chord.FixFingersDelay = time.Duration(*delay2)
+	chord.PredeccesorCheckDelay = time.Duration(*delay3)
+	chord.BackupTimeDelay = time.Duration(*delay4)
+	chord.MSet = *nbrSuccesors
+
+	ip := *ip1
+	port := *port1
+	address := ip + ":" + port
+	id := chord.Hash(address).String()
+	if (*idOverwrite != "") && (len(*idOverwrite) == 48) {
+		id = *idOverwrite
+	}
+	c.node = chord.NewNode(port, c.debug, id)
+
+	fmt.Printf("<LocalNode>: %+v\n", *c.node)
+
+	if *ip2 != "" || *port2 != "" {
+		hostIP := *ip2
+		hostPort := *port2
+		hostAddress := hostIP + ":" + hostPort
+		hostID := chord.Hash(hostAddress).String()
+		hostNode := chord.Node{Host: hostIP, Port: hostPort, Id: hostID, Address: hostAddress}
+		fmt.Printf("<HostNode>: %+v\n", hostNode)
+		c.node.Join(hostAddress)
+	} else {
+		c.node.Create()
+	}
+}

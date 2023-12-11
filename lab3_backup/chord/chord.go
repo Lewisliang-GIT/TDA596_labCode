@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	DefaultHost = "localHost"
-	DefaultPort = "3410"
+	DefaultHost = ""
+	DefaultPort = ""
 )
 
 //actually a struct is here:

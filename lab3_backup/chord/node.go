@@ -16,14 +16,20 @@ const (
 	refreshTime = 100 * time.Millisecond // adjust to avoid error:connectex: Only one usage of each socket address (protocol/network address/port) is normally permitted. in Stabilize with Notify err:
 )
 
+var RefreshTime time.Duration
+var FixFingersDelay time.Duration
+var PredeccesorCheckDelay time.Duration
+var BackupTimeDelay time.Duration
+var MSet int
+
 // Node of a virtual machine-- each resource is in Data
 type Node struct {
 	// HOst + ":" + Port = address of node(server), using n.addr() to get
-	Host string
-	Port string
-	// Id             *big.Int // hash(addr)
+	Host           string
+	Port           string
+	Id             string //*big.Int // hash(addr)
 	Address        string
-	SuccessorTable [suSize + 1]string // do at 1, 2, 3; using 0 to do successor, so that can simplify
+	SuccessorTable []string // do at 1, 2, 3; using 0 to do successor, so that can simplify susize+1
 	successor      string
 	Predecessor    string
 
@@ -41,15 +47,16 @@ type KVP struct {
 }
 
 func init() {
-	os.MkdirAll("backup", os.ModeType)
+	os.MkdirAll("backup", 0777)
 }
 
-func NewNode(_port string, _debug bool) *Node {
+func NewNode(_port string, _debug bool, _id string) *Node {
 	_host := GetAddress()
 
 	p := &Node{
 		Host: _host,
 		Port: _port,
+		Id:   _id,
 		// Id:    Hash(fmt.Sprintf("%v:%v", _host, _port)),
 		Address: fmt.Sprintf("%v:%v", _host, _port),
 		Data:    make(map[string]string),
@@ -62,9 +69,10 @@ func NewNode(_port string, _debug bool) *Node {
 }
 
 // init predecessor and successor
-func (n *Node) create() {
+func (n *Node) Create() {
 	n.Predecessor = "" //Addr(n) // or "", can be stablized later
 	n.successor = n.Address
+	n.SuccessorTable = make([]string, MSet+1)
 	for i, _ := range n.SuccessorTable {
 		n.SuccessorTable[i] = n.Address
 	}
@@ -111,11 +119,11 @@ func (n *Node) merge() {
 }
 
 // init node's info
-func (n *Node) join(address string) error {
+func (n *Node) Join(address string) error {
 	n.Predecessor = "" // have to be stablized later
 	addr, err := RPCFindSuccessor(address, Hash(n.Address))
 	if err != nil {
-		fmt.Printf("node join-findsuccessor %v\n", err)
+		fmt.Printf("node Join-findsuccessor %v\n", err)
 		fmt.Println("Address is ", n.Address, address, addr)
 		return err
 	}
@@ -145,9 +153,9 @@ func (n *Node) join(address string) error {
 	return nil
 }
 
-func (n *Node) CopySuccessor(a bool, table *([suSize + 1]string)) error {
+func (n *Node) CopySuccessor(a bool, table []string) error {
 	// fmt.Println("From ", n.Address, n.SuccessorTable)
-	for i := 0; i <= suSize; i++ {
+	for i := 0; i <= MSet; i++ {
 		// fmt.Printf("change %s to %s\n", (*table)[i], n.SuccessorTable[i])
 		table[i] = n.SuccessorTable[i]
 	}
@@ -163,7 +171,7 @@ func (n *Node) fixSuccessorTable() error {
 	}
 	// fmt.Println("Mid ", n.successor, n.SuccessorTable)
 
-	for i := suSize - 1; i >= 0; i-- {
+	for i := MSet - 1; i >= 0; i-- {
 		n.SuccessorTable[i+1] = n.SuccessorTable[i]
 	}
 	n.SuccessorTable[0] = n.successor
@@ -215,7 +223,7 @@ func (n *Node) FindSuccessor(id *big.Int, successor *string) error {
 		return nil
 	}
 
-	for i := 1; i <= suSize; i++ {
+	for i := 1; i <= MSet+1; i++ {
 		// fmt.Println("circle")
 		if _, err := RPCPing(n.SuccessorTable[i]); err == nil && InclusiveBetween(id, Hash(n.SuccessorTable[i-1]), Hash(n.SuccessorTable[i])) { //id ∈ (n, successor]
 			*successor = n.SuccessorTable[i]

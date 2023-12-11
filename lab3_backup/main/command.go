@@ -35,6 +35,7 @@ type command struct {
 	server *chord.Server
 	port   string // dht.DefaultPort
 	host   string // dht.DefaultHost
+	id     string
 	line   []string
 
 	debug     bool
@@ -46,7 +47,7 @@ func (c *command) _init() {
 	if c.port == "" {
 		c.port = chord.DefaultPort
 	}
-	c.node = chord.NewNode(c.port, c.debug)
+	c.node = chord.NewNode(c.port, c.debug, c.id)
 	c.server = chord.NewServer(c.node)
 }
 
