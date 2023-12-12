@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="2a595042-eef5-499f-9153-ca23716b4c2c" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/lab3/chord/command.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lab3_backup/main/command.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3/chord/finger.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3/chord/finger.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3/chord/node.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3/chord/node.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3/chord/rpc.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3/chord/rpc.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3/chord/store.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3/chord/store.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3/chord/structures.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3/main/main.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3_backup/chord/chord.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3_backup/chord/chord.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3_backup/chord/node.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3_backup/chord/node.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3_backup/chord/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3_backup/chord/server.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3_backup/main/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/lab3_backup/main/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lab3_backup/main/test.go" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Go File" />
+      </list>
+    </option>
+  </component>
+  <component name="GOROOT" url="file://$USER_HOME$/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.21.5.linux-amd64" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 3
+}]]></component>
+  <component name="ProjectId" id="2ZOyQ98ci36w21udE1F3ijzx3VD" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "DefaultGoTemplateProperty": "Go File",
+    "Go Build.go build lab3.executor": "Run",
+    "Go Build.go build lab3/chord.executor": "Run",
+    "Go Build.go build lab3/main.executor": "Run",
+    "Go Build.go build lab3_backup/backup.executor": "Debug",
+    "Go Build.go build lab3_backup/main.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.go.modules.automatic.dependencies.download": "true",
+    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
+    "git-widget-placeholder": "lewis-test",
+    "go.import.settings.migrated": "true",
+    "go.sdk.automatically.set": "true",
+    "last_opened_file_path": "/home/tianyi/course/distribute-system/TDA596_labCode",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "editor.preferences.tabs"
+  }
+}]]></component>
+  <component name="RunManager" selected="Go Build.go build lab3_backup/backup">
+    <configuration name="go build lab3" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
+      <module name="labcode" />
+      <working_directory value="$PROJECT_DIR$/lab3" />
+      <kind value="PACKAGE" />
+      <package value="lab3" />
+      <directory value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="go build lab3_backup/backup" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
+      <module name="labcode" />
+      <working_directory value="$PROJECT_DIR$/lab3_backup" />
+      <kind value="PACKAGE" />
+      <package value="lab3_backup/backup" />
+      <directory value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="go build lab3_backup/main" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
+      <module name="labcode" />
+      <working_directory value="$PROJECT_DIR$/lab3_backup" />
+      <kind value="PACKAGE" />
+      <package value="lab3_backup/main" />
+      <directory value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="go build lab3/chord" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
+      <module name="labcode" />
+      <working_directory value="$PROJECT_DIR$/lab3" />
+      <kind value="PACKAGE" />
+      <package value="lab3/chord" />
+      <directory value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="go build lab3/main" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
+      <module name="labcode" />
+      <working_directory value="$PROJECT_DIR$/lab3" />
+      <kind value="PACKAGE" />
+      <package value="lab3/main" />
+      <directory value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Go Build.go build lab3_backup/backup" />
+        <item itemvalue="Go Build.go build lab3_backup/main" />
+        <item itemvalue="Go Build.go build lab3/chord" />
+        <item itemvalue="Go Build.go build lab3" />
+        <item itemvalue="Go Build.go build lab3/main" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-gosdk-467a64f6063b-ee0e143f3e2b-org.jetbrains.plugins.go.sharedIndexes.bundled-GO-233.11799.228" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VgoProject">
+    <settings-migrated>true</settings-migrated>
+  </component>
+</project>
