@@ -13,7 +13,7 @@ import (
 const (
 	m           = 160 // 0-base indexing
 	suSize      = 3
-	refreshTime = 100 * time.Millisecond // adjust to avoid error:connectex: Only one usage of each socket address (protocol/network address/port) is normally permitted. in Stabilize with Notify err:
+	refreshTime = 100 * time.Millisecond // adjust to avoid error:connectex: Only one usage of each socket address (protocol/network address/CPort) is normally permitted. in Stabilize with Notify err:
 )
 
 var RefreshTime time.Duration
@@ -24,13 +24,13 @@ var MSet int
 
 // Node of a virtual machine-- each resource is in Data
 type Node struct {
-	// HOst + ":" + Port = address of node(server), using n.addr() to get
+	// HOst + ":" + Port = address of node(Server), using n.addr() to get
 	Host           string
 	Port           string
 	Id             string //*big.Int // hash(addr)
 	Address        string
-	SuccessorTable []string // do at 1, 2, 3; using 0 to do successor, so that can simplify susize+1
-	successor      string
+	SuccessorTable [suSize + 1]string // do at 1, 2, 3; using 0 to do Successor, so that can simplify susize+1
+	Successor      string
 	Predecessor    string
 
 	Data        map[string]string
@@ -68,11 +68,10 @@ func NewNode(_port string, _debug bool, _id string) *Node {
 	return p
 }
 
-// init predecessor and successor
+// init predecessor and Successor
 func (n *Node) Create() {
 	n.Predecessor = "" //Addr(n) // or "", can be stablized later
-	n.successor = n.Address
-	n.SuccessorTable = make([]string, MSet+1)
+	n.Successor = n.Address
 	for i, _ := range n.SuccessorTable {
 		n.SuccessorTable[i] = n.Address
 	}
@@ -86,7 +85,7 @@ func (n *Node) Create() {
 }
 
 func (n *Node) Besplited(address string, response *bool) error {
-	// if n.Port == "8003" {
+	// if n.CPort == "8003" {
 	// 	n.dump()
 	// 	fmt.Println("WTF:::: ", address)
 	// }
@@ -109,11 +108,11 @@ func (n *Node) Besplited(address string, response *bool) error {
 func (n *Node) merge() {
 	var response bool
 	for key, val := range n.Data {
-		for err := Call(n.successor, "Node.Put", KVP{K: key, V: val}, &response); err != nil; err = Call(n.successor, "Node.Put", KVP{K: key, V: val}, &response) {
+		for err := Call(n.Successor, "Node.Put", KVP{K: key, V: val}, &response); err != nil; err = Call(n.Successor, "Node.Put", KVP{K: key, V: val}, &response) {
 			// n.dump()
 			// fmt.Printf("Merge err : %v\n", err)
 		}
-		// fmt.Printf("merge %s to %s: %s, %s\n", n.Address, n.successor, key, val)
+		// fmt.Printf("merge %s to %s: %s, %s\n", n.Address, n.Successor, key, val)
 	}
 	return
 }
@@ -127,24 +126,24 @@ func (n *Node) Join(address string) error {
 		fmt.Println("Address is ", n.Address, address, addr)
 		return err
 	}
-	n.successor = addr
+	n.Successor = addr
 	if err := n.fixSuccessorTable(); err != nil {
 		return err
 	}
 
-	//notify the successor[0]
-	if err := RPCNotify(n.successor, n.Address); err != nil {
+	//notify the Successor[0]
+	if err := RPCNotify(n.Successor, n.Address); err != nil {
 		fmt.Println("Join but Notify err")
 	}
-	// if n.Port == "8006" { //} || n.Port == "8003" {
+	// if n.CPort == "8006" { //} || n.CPort == "8003" {
 	// 	n.dump()
 	// }
 
 	var response bool
-	if err := Call(n.successor, "Node.Besplited", n.Address, &response); err != nil {
+	if err := Call(n.Successor, "Node.Besplited", n.Address, &response); err != nil {
 		fmt.Println("split err")
 	}
-	// if n.Port == "8006" {
+	// if n.CPort == "8006" {
 	// 	n.dump()
 	// }
 
@@ -153,9 +152,9 @@ func (n *Node) Join(address string) error {
 	return nil
 }
 
-func (n *Node) CopySuccessor(a bool, table []string) error {
+func (n *Node) CopySuccessor(a bool, table *[suSize + 1]string) error {
 	// fmt.Println("From ", n.Address, n.SuccessorTable)
-	for i := 0; i <= MSet; i++ {
+	for i := 0; i <= suSize; i++ {
 		// fmt.Printf("change %s to %s\n", (*table)[i], n.SuccessorTable[i])
 		table[i] = n.SuccessorTable[i]
 	}
@@ -166,15 +165,15 @@ func (n *Node) CopySuccessor(a bool, table []string) error {
 func (n *Node) fixSuccessorTable() error {
 	var a bool
 	// fmt.Println(">>>Before ", n.successor, n.SuccessorTable)
-	if err := Call(n.successor, "Node.CopySuccessor", a, &n.SuccessorTable); err != nil {
+	if err := Call(n.Successor, "Node.CopySuccessor", a, &n.SuccessorTable); err != nil {
 		return err
 	}
 	// fmt.Println("Mid ", n.successor, n.SuccessorTable)
 
-	for i := MSet - 1; i >= 0; i-- {
+	for i := suSize - 1; i >= 0; i-- {
 		n.SuccessorTable[i+1] = n.SuccessorTable[i]
 	}
-	n.SuccessorTable[0] = n.successor
+	n.SuccessorTable[0] = n.Successor
 	// fmt.Println("Copy ", n.successor, n.SuccessorTable)
 	return nil
 }
@@ -182,7 +181,7 @@ func (n *Node) fixSuccessorTable() error {
 // search the local table for the highest predecessor of id
 // n.closest_preceding_node(id)
 // if empty, return "", left to let
-// find finger[i] ∈ (n, id)
+// Find finger[i] ∈ (n, id)
 func (n *Node) findFingerTable(id *big.Int) string {
 	for i := m - 1; i >= 0; i-- {
 		if _, err := RPCPing(n.FingerTable[i]); err != nil {
@@ -193,7 +192,7 @@ func (n *Node) findFingerTable(id *big.Int) string {
 		//或者说，正着找，找到第一个finger使得finger是id的一个假后继，然后前一个finger就是pre——node
 		if ExclusiveBetween(Hash(n.FingerTable[i]), Hash(n.Address), id) {
 			// the return should be i - 1
-			// what if i == 0?, impossible for successor have to be included
+			// what if i == 0?, impossible for Successor have to be included
 
 			return n.FingerTable[i]
 		}
@@ -212,27 +211,27 @@ func (n *Node) findFingerTable(id *big.Int) string {
 // If the id I'm looking for falls between me and mySuccessor
 // Then the data for this id will be found on mySuccessor
 // ------------>>>will do finger table later
-// ask node n to find the successor of id
+// ask node n to find the Successor of id
 // or a better node to continue the search with
 // !!!!!maybe can repete with some node(in fixfinger)
 func (n *Node) FindSuccessor(id *big.Int, successor *string) error {
 	// fmt.Println(Hash(n.Address), id, n.Address)
-	if _, err := RPCPing(n.successor); err == nil && InclusiveBetween(id, Hash(n.Address), Hash(n.successor)) {
-		*successor = n.successor
-		// fmt.Println(id, " successor find:", n.Address, n.successor)
+	if _, err := RPCPing(n.Successor); err == nil && InclusiveBetween(id, Hash(n.Address), Hash(n.Successor)) {
+		*successor = n.Successor
+		// fmt.Println(id, " Successor find:", n.Address, n.Successor)
 		return nil
 	}
 
-	for i := 1; i <= MSet+1; i++ {
+	for i := 1; i <= suSize; i++ {
 		// fmt.Println("circle")
-		if _, err := RPCPing(n.SuccessorTable[i]); err == nil && InclusiveBetween(id, Hash(n.SuccessorTable[i-1]), Hash(n.SuccessorTable[i])) { //id ∈ (n, successor]
+		if _, err := RPCPing(n.SuccessorTable[i]); err == nil && InclusiveBetween(id, Hash(n.SuccessorTable[i-1]), Hash(n.SuccessorTable[i])) { //id ∈ (n, Successor]
 			*successor = n.SuccessorTable[i]
-			// fmt.Println(id, " successor find: ", n.SuccessorTable[i-1], n.SuccessorTable[i])
+			// fmt.Println(id, " Successor find: ", n.SuccessorTable[i-1], n.SuccessorTable[i])
 			return nil
 		}
 	}
 
-	//wont loop if successor is exists
+	//wont loop if Successor is exists
 	// fmt.Println(n)
 
 	nextAddr := n.findFingerTable(id)
@@ -260,8 +259,8 @@ func (n *Node) GetPredecessor(none bool, addr *string) error {
 // address maybe the n's Predecessor
 func (n *Node) Notify(new_predecessor string, response *bool) error {
 	if n.Predecessor == "" || ExclusiveBetween(Hash(new_predecessor), Hash(n.Predecessor), Hash(n.Address)) {
-		// if n.Port == "10.163.174.211:8004" {
-		// 	fmt.Println("8004 port is notifying")
+		// if n.CPort == "10.163.174.211:8004" {
+		// 	fmt.Println("8004 CPort is notifying")
 		// 	n.dump()
 		// 	fmt.Printf("%s Notify %s\n", n.Address, new_predecessor)
 		// }
@@ -311,8 +310,8 @@ func (n *Node) fixFingerTable() {
 	}
 }
 
-// Call periodly, verfiy succcessor, tell the successor of n
-// only check successor 1
+// Call periodly, verfiy succcessor, tell the Successor of n
+// only check Successor 1
 func (n *Node) stabilize() {
 	for _, cur := range n.SuccessorTable {
 		if _, err := RPCPing(cur); err != nil {
@@ -321,20 +320,20 @@ func (n *Node) stabilize() {
 
 		if pre_i, err := RPCGetPredecessor(cur); err == nil {
 			if ExclusiveBetween(Hash(pre_i), Hash(n.Address), Hash(cur)) {
-				n.successor = pre_i
+				n.Successor = pre_i
 			}
 		} else {
 			// fmt.Printf("%s stabilize[%d] err %v\n", n.Address, i, err)
 			// n.dump()
 		}
 		if err := n.fixSuccessorTable(); err != nil {
-			n.successor = n.SuccessorTable[0]
-			// RPCNotify(n.successor, Addr(n))
+			n.Successor = n.SuccessorTable[0]
+			// RPCNotify(n.Successor, Addr(n))
 			fmt.Printf("[%s]Stabilize fix SuccessoTable %v\n", n.Address, err)
 			continue
 		}
 
-		if err := RPCNotify(n.successor, n.Address); err != nil {
+		if err := RPCNotify(n.Successor, n.Address); err != nil {
 			fmt.Printf("[%s]Stabilize Notify %v\n", n.Address, err)
 		}
 
@@ -442,7 +441,7 @@ S: %v		Successors: %v
 Next: %v	Predecessor: %v
 Data: %v
 Finger: %v
-`, Hash(node.Address), node.Address, node.successor, node.SuccessorTable, node.next, node.Predecessor, node.Data, node.FingerTable[:60])
+`, Hash(node.Address), node.Address, node.Successor, node.SuccessorTable, node.next, node.Predecessor, node.Data, node.FingerTable[:60])
 }
 
 func (n *Node) backup() {

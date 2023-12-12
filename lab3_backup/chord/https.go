@@ -16,15 +16,16 @@ import (
 	"strconv"
 )
 
-/* HTTP Server Functions*/
+var maxAttempts = 5
 
+/* HTTP Server Functions*/
 // Gets rid of annoying favicon requests
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// serverHandler Main handler for http requests to server, with sync mechanism
-func ServerHandler(w http.ResponseWriter, r *http.Request) {
+// ServerHandler Main handler for http requests to Server, with sync mechanism
+func (c Command) ServerHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !checkMethod(w, r) {
 		return
@@ -37,14 +38,14 @@ func ServerHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Print(string(res) + "\n")
 
 	if r.Method == "POST" {
-		postHandler(w, r)
+		c.postHandler(w, r)
 	} else {
-		getHandler(w, r, getFileType(path.Base(r.URL.Path)))
+		c.getHandler(w, r, getFileType(path.Base(r.URL.Path)))
 	}
 }
 
 // Handles GET requests
-func getHandler(w http.ResponseWriter, r *http.Request, fType string) {
+func (c Command) getHandler(w http.ResponseWriter, r *http.Request, fType string) {
 	if path.Base(r.URL.Path) == "/" {
 		fmt.Fprintf(w, "Hello, Welcome to the Main Page")
 		return
@@ -56,11 +57,11 @@ func getHandler(w http.ResponseWriter, r *http.Request, fType string) {
 		http.ServeFile(w, r, "./"+r.URL.String())
 		return
 	}
-	//proxyHandler(w, r)
+	c.proxyHandler(w, r)
 }
 
 // postHandler Handles POST requests
-func postHandler(w http.ResponseWriter, r *http.Request) {
+func (c Command) postHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse our multipart form, 10 << 20 specifies a maximum
 	// upload of 10 MB files.
 	r.ParseMultipartForm(10 << 20)
@@ -82,7 +83,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	// Create Local file
 	f, err := os.Create(handler.Filename)
 	if err != nil {
-		http.Error(w, "Error on Create file <POST>: "+err.Error(), 500)
+		http.Error(w, "Error on create file <POST>: "+err.Error(), 500)
 		return
 	}
 	defer f.Close()
@@ -99,23 +100,24 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Successfully Uploaded File,\nFeel free to visit again!!"))
 
 	/**/
-	//fileKey := Hash(handler.Filename).String()
-	belongsTo, _ := RPCFindSuccessor(handler.Filename, Hash(handler.Filename))
+	fileKey := Hash(handler.Filename).String()
+	belongsTo := Find(c.Node.Address, fileKey)
 
-	//_, ok := cNode.Bucket[fileKey]
+	_, ok := c.Node.Data[fileKey]
 	//_, ok1 := cNode.Backups[fileKey]
-	//if belongsTo.Id == cNode.LocalNode.Id || ok {
-	//	fmt.Println("<Received file>")
-	//	cNode.Bucket[fileKey] = handler.Filename
-	//	return
-	//} else if ok1 {
+	if belongsTo == c.Node.Address || ok {
+		fmt.Println("<Received file>")
+		c.Node.Data[fileKey] = handler.Filename
+		return
+	}
+	//else if ok1 {
 	//	fmt.Println("Received file backup")
 	//	cNode.Backups[fileKey] = handler.Filename
 	//	return
 	//}
 
 	fmt.Println("<Received then sent file>")
-	postSender(belongsTo, handler.Filename)
+	PostSender(belongsTo, handler.Filename)
 	/**/
 }
 
@@ -132,36 +134,36 @@ func checkMethod(w http.ResponseWriter, r *http.Request) bool {
 	}
 }
 
-// Serves get requests by forwarding them to the Main server and sends back response
-//func proxyHandler(w http.ResponseWriter, r *http.Request) {
-//	forwardtoNode := cNode.lookUp(path.Base(r.URL.Path)).Address
-//	if forwardtoNode == cNode.LocalNode.Address {
-//		http.ServeFile(w, r, "/"+r.URL.String())
-//		return
-//	}
-//
-//	forwardtoNodeAddress, _ := setHttpsPort(forwardtoNode)
-//	forwardToServerURL := "https://" + forwardtoNodeAddress
-//	client, err := HttpsClient("secure_chord.crt")
-//	if err != nil {
-//		http.Error(w, "Error in setting https client for main server: "+err.Error(), 500)
-//		return
-//	}
-//	resp, err := client.Get(forwardToServerURL + "/" + r.URL.String())
-//	if err != nil {
-//		http.Error(w, "Failure in forwarding request: "+err.Error(), 400)
-//		return
-//	}
-//
-//	defer resp.Body.Close()
-//	copyHeader(w.Header(), resp.Header)
-//	w.WriteHeader(resp.StatusCode)
-//	_, err = io.Copy(w, resp.Body)
-//	if err != nil {
-//		http.Error(w, "Error in forwarding main server response: "+err.Error(), 500)
-//		return
-//	}
-//}
+// Serves get requests by forwarding them to the Main Server and sends back response
+func (c Command) proxyHandler(w http.ResponseWriter, r *http.Request) {
+	forwardtoNode := Find(c.Node.Address, path.Base(r.URL.Path))
+	if forwardtoNode == c.Node.Address {
+		http.ServeFile(w, r, "/"+r.URL.String())
+		return
+	}
+
+	forwardtoNodeAddress, _ := setHttpsPort(forwardtoNode)
+	forwardToServerURL := "https://" + forwardtoNodeAddress
+	client, err := httpsClient("secure_chord.crt")
+	if err != nil {
+		http.Error(w, "Error in setting https client for core Server: "+err.Error(), 500)
+		return
+	}
+	resp, err := client.Get(forwardToServerURL + "/" + r.URL.String())
+	if err != nil {
+		http.Error(w, "Failure in forwarding request: "+err.Error(), 400)
+		return
+	}
+
+	defer resp.Body.Close()
+	copyHeader(w.Header(), resp.Header)
+	w.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		http.Error(w, "Error in forwarding core Server response: "+err.Error(), 500)
+		return
+	}
+}
 
 // Get file type from request file name
 func getFileType(filename string) string {
@@ -186,7 +188,7 @@ func validFileType(w http.ResponseWriter, fType string) bool {
 	}
 }
 
-// Copy source headers to destination header (use for sending back main server response)
+// Copy source headers to destination header (use for sending back main Server response)
 func copyHeader(dst, src http.Header) {
 	for k, vv := range src {
 		for _, v := range vv {
@@ -204,7 +206,7 @@ func fileExists(fileName string) bool {
 	}
 }
 
-// setHttpsPort increments address to the https port
+// setHttpsPort increments address to the https CPort
 func setHttpsPort(address string) (string, error) {
 	u, err := url.Parse("http://" + address)
 	if err != nil {
@@ -214,7 +216,7 @@ func setHttpsPort(address string) (string, error) {
 
 	p, err := strconv.Atoi(u.Port())
 	if err != nil {
-		fmt.Println("URL paring error <port>:", err)
+		fmt.Println("URL paring error <CPort>:", err)
 		return "", err
 	}
 
@@ -222,8 +224,8 @@ func setHttpsPort(address string) (string, error) {
 	return newAddress, nil
 }
 
-// HttpsClient sets the https client
-func HttpsClient(crt string) (*http.Client, error) {
+// httpsClient sets the https client
+func httpsClient(crt string) (*http.Client, error) {
 	f, err := os.Open(crt)
 	if err != nil {
 		return nil, err
@@ -255,7 +257,7 @@ func HttpsClient(crt string) (*http.Client, error) {
 	return client, nil
 }
 
-// httpsServer sets the https server
+// HttpsServer sets the https Server
 func HttpsServer(crt string) (*http.Server, error) {
 	f, err := os.Open(crt)
 	if err != nil {
@@ -283,10 +285,7 @@ func HttpsServer(crt string) (*http.Server, error) {
 	return srv, nil
 }
 
-var maxAttempts int = 5
-
-// postSender sends files to nodes through http
-func postSender(address string, filePath string) {
+func PostSender(address string, filePath string) {
 	for i := 0; i < maxAttempts; i++ {
 		err := postSender1(address, filePath)
 		if err != nil {
@@ -297,7 +296,7 @@ func postSender(address string, filePath string) {
 }
 
 func postSender1(address string, filePath string) error {
-	client, err := HttpsClient("secure_chord.crt")
+	client, err := httpsClient("secure_chord.crt")
 	if err != nil {
 		fmt.Println("Error on setting https client;", err)
 		return err

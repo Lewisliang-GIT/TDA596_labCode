@@ -62,7 +62,7 @@ func GetAddress() string {
 
 type Server struct {
 	node     *Node
-	listener net.Listener
+	Listener net.Listener
 	server   *rpc.Server
 	// listening bool
 
@@ -87,14 +87,17 @@ func NewServer(n *Node) *Server {
 }
 
 // address is in s.node
-// this is the function to run a server
+// this is the function to run a Server
 func (s *Server) Listen() error {
 	// if s.listening {
 	// return errors.New("Already listening")
 	// }
 
 	s.server = rpc.NewServer()
-	s.server.Register(s.node) //using s.node as a object to do things by rpc
+	err := s.server.Register(s.node)
+	if err != nil {
+		return err
+	} //using s.node as a object to do things by rpc
 	// rpc.HandleHTTP()
 
 	ler, err := net.Listen("tcp", ":"+s.node.Port) // address
@@ -107,15 +110,15 @@ func (s *Server) Listen() error {
 	}
 
 	s.node.Create()
-	s.listener = ler
+	s.Listener = ler
 	s.node.Listening = true
 
-	go s.server.Accept(s.listener) // goroutine
+	go s.server.Accept(s.Listener) // goroutine
 	return nil
 }
 
 // avoid repete listening???
-// the port is server.node.port(not port outside)
+// the CPort is Server.node.CPort(not CPort outside)
 func (s *Server) Join(address string) error {
 	if err := s.Listen(); err != nil {
 		return err
@@ -123,12 +126,12 @@ func (s *Server) Join(address string) error {
 	return s.node.Join(address)
 }
 
-// for a server, it means unlisten
+// for a Server, it means unlisten
 func (s *Server) Quit() error {
 	s.node.merge()
 
 	s.node.Listening = false
-	if err := s.listener.Close(); err != nil {
+	if err := s.Listener.Close(); err != nil {
 		fmt.Println(err)
 	}
 
@@ -150,7 +153,7 @@ func (s *Server) RemoveFile() error {
 }
 
 func (s *Server) IsListening() bool {
-	return s.listener != nil
+	return s.Listener != nil
 	// return s.listening
 }
 

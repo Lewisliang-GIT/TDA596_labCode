@@ -1,9 +1,8 @@
-package main
+package chord
 
 import (
 	"errors"
 	"fmt"
-	"lab3_backup/chord"
 	"math/rand"
 	"strconv"
 )
@@ -30,46 +29,46 @@ func init() {
 	ARGUMENTS_NUM = errors.New("arguments number error")
 }
 
-type command struct {
-	node   *chord.Node
-	server *chord.Server
-	port   string // dht.DefaultPort
+type Command struct {
+	Node   *Node
+	Server *Server
+	CPort  string // dht.DefaultPort
 	host   string // dht.DefaultHost
 	id     string
 	line   []string
 
-	debug     bool
+	Debug     bool
 	listening bool // or begin maybe
 }
 
-// may change the port, once init(), cant change again, so dont use _init()
-func (c *command) _init() {
-	if c.port == "" {
-		c.port = chord.DefaultPort
+// may change the CPort, once init(), cant change again, so dont use _init()
+func (c *Command) _init() {
+	if c.CPort == "" {
+		c.CPort = DefaultPort
 	}
-	c.node = chord.NewNode(c.port, c.debug, c.id)
-	c.server = chord.NewServer(c.node)
+	c.Node = NewNode(c.CPort, c.Debug, c.id)
+	c.Server = NewServer(c.Node)
 }
 
-// port setting, before a server is init
-func (c *command) Port(args ...string) error {
-	if c.node != nil || c.listening {
-		return errors.New("port can't set again after calling create or join")
+// CPort setting, before a Server is init
+func (c *Command) Port(args ...string) error {
+	if c.Node != nil || c.listening {
+		return errors.New("CPort can't set again after calling create or join")
 	}
 
 	if len(args) > 1 {
 		return TOO_MANY_ARGUMENTS
 	} else if len(args) == 0 {
-		c.port = chord.DefaultPort
+		c.CPort = DefaultPort
 	} else {
-		c.port = args[0]
+		c.CPort = args[0]
 	}
 
-	fmt.Printf("Port set to %v\n", c.port)
+	fmt.Printf("CPort set to %v\n", c.CPort)
 	return nil
 }
 
-func (c *command) Create(args ...string) error {
+func (c *Command) Create(args ...string) error {
 	if len(args) > 0 {
 		return TOO_MANY_ARGUMENTS
 	}
@@ -79,15 +78,18 @@ func (c *command) Create(args ...string) error {
 		c.listening = true
 	}
 
-	c._init()
-	c.server.Listen()
-	fmt.Println("Node(created) listening at ", c.node.Address)
+	//c._init()
+	err := c.Server.Listen()
+	if err != nil {
+		return err
+	}
+	fmt.Println("Node(created) listening at ", c.Node.Address)
 	return nil
 }
 
-// begin to listen server.node.address+port;
+// begin to listen Server.node.address+CPort;
 // node join at args[0](existing address)
-func (c *command) Join(args ...string) error {
+func (c *Command) Join(args ...string) error {
 	if len(args) > 1 {
 		return TOO_MANY_ARGUMENTS
 	}
@@ -97,13 +99,13 @@ func (c *command) Join(args ...string) error {
 		c.listening = true
 	}
 
-	c._init()
-	addres := chord.DefaultHost + ":" + chord.DefaultPort
+	//c._init()
+	addres := DefaultHost + ":" + DefaultPort
 	if len(args) == 1 {
 		addres = args[0]
 	}
 
-	err := c.server.Join(addres)
+	err := c.Server.Join(addres)
 	if err != nil {
 		c.listening = false
 		// log.Panicf("Join error %v", err)
@@ -113,7 +115,7 @@ func (c *command) Join(args ...string) error {
 	return nil
 }
 
-func (c *command) Quit(args ...string) error {
+func (c *Command) Quit(args ...string) error {
 	if len(args) > 1 {
 		return TOO_MANY_ARGUMENTS
 	}
@@ -123,12 +125,12 @@ func (c *command) Quit(args ...string) error {
 		c.listening = false
 	}
 
-	if c.server == nil {
+	if c.Server == nil {
 		// fmt.Println("Pragram end")
 		return nil
 	}
 
-	if err := c.server.Quit(); err != nil {
+	if err := c.Server.Quit(); err != nil {
 		fmt.Printf("Server Quit: %v\n", err)
 	} else {
 		// fmt.Println("Program end")
@@ -137,7 +139,7 @@ func (c *command) Quit(args ...string) error {
 	return nil
 }
 
-func (c *command) Dump(args ...string) error {
+func (c *Command) Dump(args ...string) error {
 	if len(args) != 0 {
 		return TOO_MANY_ARGUMENTS
 	}
@@ -145,14 +147,14 @@ func (c *command) Dump(args ...string) error {
 		return NO_SERVICE
 	}
 
-	fmt.Println(c.server.Debug())
+	fmt.Println(c.Server.Debug())
 	return nil
 }
 
 // Debug func----using dial
 // fake ping
 // test if args[0](address) is listening
-func (c *command) Ping(args ...string) error {
+func (c *Command) Ping(args ...string) error {
 	if len(args) == 0 {
 		return FEW_ARGUMENTS
 	} else if len(args) > 1 {
@@ -162,7 +164,7 @@ func (c *command) Ping(args ...string) error {
 		return NO_SERVICE
 	}
 
-	if response, err := chord.RPCPing(args[0]); err != nil {
+	if response, err := RPCPing(args[0]); err != nil {
 		return err
 	} else {
 		fmt.Printf("Got response %d from Ping(3)\n", response)
@@ -173,7 +175,7 @@ func (c *command) Ping(args ...string) error {
 }
 
 // / put key value
-func (c *command) Put(args ...string) error {
+func (c *Command) Put(args ...string) error {
 	if len(args) != 2 {
 		return errors.New(TOO_MANY_ARGUMENTS.Error() + FEW_ARGUMENTS.Error())
 	}
@@ -182,7 +184,7 @@ func (c *command) Put(args ...string) error {
 		return NO_SERVICE
 	}
 
-	if err := chord.RPCPut(c.node.Address, args[0], args[1]); err != nil {
+	if err := RPCPut(c.Node.Address, args[0], args[1]); err != nil {
 		//fmt.Fprintln(&buffer, false)
 		return err
 	} else {
@@ -191,7 +193,7 @@ func (c *command) Put(args ...string) error {
 	}
 }
 
-func (c *command) Get(args ...string) error {
+func (c *Command) Get(args ...string) error {
 	if len(args) != 1 {
 		return ARGUMENTS_NUM
 	}
@@ -199,13 +201,13 @@ func (c *command) Get(args ...string) error {
 		return NO_SERVICE
 	}
 
-	_, err := chord.RPCGet(c.node.Address, args[0])
+	_, err := RPCGet(c.Node.Address, args[0])
 	//fmt.Fprintln(&buffer, response)
 
 	return err
 }
 
-func (c *command) Del(args ...string) error {
+func (c *Command) Del(args ...string) error {
 	if len(args) != 1 {
 		return ARGUMENTS_NUM
 	}
@@ -213,7 +215,7 @@ func (c *command) Del(args ...string) error {
 		return NO_SERVICE
 	}
 
-	if _, err := chord.RPCDel(c.node.Address, args[0]); err != nil {
+	if _, err := RPCDel(c.Node.Address, args[0]); err != nil {
 		//fmt.Fprintln(&buffer, resp)
 		return err
 	} else {
@@ -222,7 +224,7 @@ func (c *command) Del(args ...string) error {
 	}
 }
 
-func (c *command) Help(args ...string) error {
+func (c *Command) Help(args ...string) error {
 	var err error
 	if len(args) > 1 {
 		err = TOO_MANY_ARGUMENTS
@@ -235,11 +237,11 @@ func (c *command) Help(args ...string) error {
 
 		fmt.Println(`Commands are:
 
-Current command
-	help		displays recognized commands<current command>
+Current Command
+	help		displays recognized commands<current Command>
 
 Commands related to DHT rings:
-	port /<n>	set the listen-on port<n>. (default  3410)
+	CPort /<n>	set the listen-on CPort<n>. (default  3410)
 	create		create a new ring.
 	join <add>	join an existing ring.
 	quit		shut down. This quits and ends the program. 
@@ -256,34 +258,34 @@ Commands that are useful mainly for debugging:
 	dumpaddr <add>	similar to above, but query a specific host and dump its info.
 	dumpall			walk around the ring, dumping all in clockwise order.
 
-Get more details of each command, you can use order <help+command>
+Get more details of each Command, you can use order <help+Command>
 eg: help dump, then you will get details of 'dump'
 `)
 	case 1:
 
 		switch args[0] {
 		case "help":
-			fmt.Println("the simplest command. This displays a list of recognized commands. Also, the current command")
-		case "port":
+			fmt.Println("the simplest Command. This displays a list of recognized commands. Also, the current Command")
+		case "CPort":
 			fmt.Println(`
-port <n> or port
-set the port that this node should listen on. 
-By default, this should be port 3410, but users can set it to something else.
-This command only works before a ring has been created or joined. After that point, trying to issue this command is an error.
+CPort <n> or CPort
+set the CPort that this node should listen on. 
+By default, this should be CPort 3410, but users can set it to something else.
+This Command only works before a ring has been created or joined. After that point, trying to issue this Command is an error.
 `)
 		case "create":
 			fmt.Println(`
 create
 create a new ring.
-This command only works before a ring has been created or joined. 
-After that point, trying to issue this command is an error.
+This Command only works before a ring has been created or joined. 
+After that point, trying to issue this Command is an error.
 `)
 		case "join":
 			fmt.Println(`
 join <address>
 join an existing ring, one of whose nodes is at the address specified.
-This command only works before a ring has been created or joined.
-After that point, trying to issue this command is an error.
+This Command only works before a ring has been created or joined.
+After that point, trying to issue this Command is an error.
 `)
 		case "quit":
 			fmt.Println(`
@@ -362,38 +364,38 @@ walk around the ring, dumping all information about every peer in the ring in cl
 (display the current host, then its successor, etc).
 `)
 		default:
-			fmt.Println("Wrong command, get help from command help")
+			fmt.Println("Wrong Command, get help from Command help")
 		}
 	default:
-		fmt.Println("Wrong command, get help from command help")
+		fmt.Println("Wrong Command, get help from Command help")
 	}
 
 	return err
 }
 
-// //can specially judge server and client.
-// //switch server and client and some infos
-// //order is like: "test server" or "test client msg"
+// //can specially judge Server and client.
+// //switch Server and client and some infos
+// //order is like: "test Server" or "test client msg"
 // func Test(args ...string) error {
 
 // 	}
 
-// 	if args[0] == "server" {
+// 	if args[0] == "Server" {
 // 		_init()
-// 		fmt.Println("server is doing things")
-// 		server.Listen()
+// 		fmt.Println("Server is doing things")
+// 		Server.Listen()
 // 	} else if args[0] == "client" {
 // 		if len(args) != 2 {
-// 			return errors.New("need command like : test client/server msg[only one]")
+// 			return errors.New("need Command like : test client/Server msg[only one]")
 // 		}
 // 		fmt.Println("client is dong things")
-// 		dht.Testcli(host+":"+port, args[1])
+// 		dht.Testcli(host+":"+CPort, args[1])
 // 	}
 
 // 	return nil
 // }
 
-func (c *command) Backup(args ...string) error {
+func (c *Command) Backup(args ...string) error {
 	if len(args) != 0 {
 		return TOO_MANY_ARGUMENTS
 	}
@@ -401,10 +403,10 @@ func (c *command) Backup(args ...string) error {
 		return NO_SERVICE
 	}
 
-	c.server.Backup()
+	c.Server.Backup()
 	return nil
 }
-func (c *command) Recover(args ...string) error {
+func (c *Command) Recover(args ...string) error {
 	if len(args) != 0 {
 		return TOO_MANY_ARGUMENTS
 	}
@@ -412,11 +414,11 @@ func (c *command) Recover(args ...string) error {
 		return NO_SERVICE
 	}
 
-	c.server.Recover()
+	c.Server.Recover()
 	return nil
 }
 
-func (c *command) Random(args ...string) error {
+func (c *Command) Random(args ...string) error {
 	var x int
 	var err error
 	if len(args) == 0 {
@@ -442,9 +444,9 @@ func (c *command) Random(args ...string) error {
 
 	return err
 }
-func (c *command) Remove(args ...string) error {
+func (c *Command) Remove(args ...string) error {
 	if len(args) >= 1 {
 		return TOO_MANY_ARGUMENTS
 	}
-	return c.server.RemoveFile()
+	return c.Server.RemoveFile()
 }

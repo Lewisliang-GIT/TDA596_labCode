@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"math/big"
 	"net/rpc"
+	"path/filepath"
 )
 
 const (
 	DefaultHost = ""
-	DefaultPort = ""
+	DefaultPort = "1234"
 )
 
 //actually a struct is here:
@@ -90,9 +91,9 @@ func RPCPing(address string) (int, error) {
 	return response, nil
 }
 
-// if return "", cant do the function anymore, return errors till main()
+// if return "", cant do the function anymore, return errors till core()
 // if dial is panic, panic the whole program????????????
-func find(address string, key string) string {
+func Find(address string, key string) string {
 	response, err := RPCFindSuccessor(address, Hash(key))
 	if err != nil {
 		fmt.Printf("find address: %v\n", err) //maybe panic??
@@ -103,10 +104,18 @@ func find(address string, key string) string {
 }
 
 func RPCPut(address string, key string, val string) error {
-	put_node := find(address, key) // key's successor
+	_, fileName := filepath.Split(val)
+	fileKey := Hash(fileName).String()
+	//main.call(sendTo.Address, "ChordNode.Put", RpcArgs{fileKey,
+	//	fileName, nil, nil, nil})
+	//
+	//fmt.Printf("File Sent To Node: %+v\nNew File Path: %s\n", *sendTo, fileName)
+	//return sendTo
+	put_node := Find(address, fileKey) // key's Successor
 	if put_node == "" {
 		return errors.New("can't get address")
 	}
+	PostSender(address, val)
 
 	var response bool
 	if err := Call(put_node, "Node.Put", KVP{K: key, V: val}, &response); err != nil {
@@ -120,7 +129,7 @@ func RPCPut(address string, key string, val string) error {
 	return nil
 }
 func RPCGet(address string, key string) (string, error) {
-	get_node := find(address, key) // key's successor
+	get_node := Find(address, key) // key's Successor
 	if get_node == "" {
 		return "", errors.New("can't get address")
 	}
@@ -135,7 +144,7 @@ func RPCGet(address string, key string) (string, error) {
 }
 
 func RPCDel(address string, key string) (bool, error) {
-	del_node := find(address, key) // key's successor
+	del_node := Find(address, key) // key's Successor
 	if del_node == "" {
 		return false, errors.New("can't get address")
 	}

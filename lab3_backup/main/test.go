@@ -11,6 +11,9 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
+	"net"
+	"net/http"
+	"net/rpc"
 	"os"
 	"strconv"
 	"strings"
@@ -19,20 +22,55 @@ import (
 
 var (
 	buffer bytes.Buffer
+	node   chord.Node
+	Cmd    chord.Command
+	err    error
 )
-var node chord.Node
-var Cmd command
-var err error
 
 func init() {
 
 }
 func main() {
-	fmt.Printf("--------------------- <%s> ---------------------\n", 888)
-	commandlineFlags()
-	for {
-		c := &Cmd
+	fmt.Printf("--------------------- <%s> ---------------------\n", chord.GetAddress())
+	c := &Cmd
+	commandlineFlags(c)
+	log.Println(c.Node)
+	c.Server = chord.NewServer(c.Node)
+	err := rpc.Register(c.Node)
+	if err != nil {
+		log.Fatal("error registering node", err)
+	}
 
+	c.Server.Listener, _ = net.Listen("tcp", ":"+c.Node.Port)
+	c.Node.Listening = true
+	log.Println(c.Node)
+	newP, e1 := strconv.Atoi(c.Node.Port)
+	l1, e := net.Listen("tcp", ":"+strconv.Itoa(newP+1))
+	if e != nil || e1 != nil {
+		log.Fatal("listen error:", e)
+	}
+	srv, err := chord.HttpsServer("client.crt")
+	if err != nil {
+		log.Fatal("Failed to set https Server:", err)
+	}
+	srv.Addr = ":" + strconv.Itoa(newP+1)
+	go func() {
+		rpc.HandleHTTP()
+		if err := http.Serve(c.Server.Listener, nil); err != nil {
+			fmt.Printf("Error serving HTTP requests: <%v>\n", err)
+			os.Exit(1)
+		}
+	}()
+
+	go func() {
+		//http.HandleFunc("/favicon.ico", faviconHandler)
+		http.HandleFunc("/", c.ServerHandler)
+		if err := srv.ServeTLS(l1, "secure_chord.crt", "secure_chord.key"); err != nil {
+			fmt.Printf("Error serving HTTP requests: <%v>\n", err)
+			os.Exit(1)
+		}
+	}()
+	for {
 		line, _ := getline(os.Stdin)
 
 		cnt := 0
@@ -137,7 +175,7 @@ func getline(reader io.Reader) ([]string, error) {
 func main3() {
 	//green := color.New(color.FgGreen)
 	//red := color.New(color.FgRed)
-	var Cmd command
+	var Cmd chord.Command
 	cnt := 0
 	// rand.Seed(time.Now().Unix())
 
@@ -203,7 +241,7 @@ func main3() {
 // 	Quit(args ...string) error
 // 	Help(args ...string) error
 
-// 	Port(args ...string) error
+// 	CPort(args ...string) error
 // 	Create(args ...string) error
 // 	Join(args ...string) error
 // 	Put(args ...string) error
@@ -222,8 +260,7 @@ func main3() {
 
 //operator domains
 
-func commandlineFlags() {
-	c := &Cmd
+func commandlineFlags(c *chord.Command) {
 	ip1 := flag.String("a", "", "The IP address that the Chord client will bind to")
 	port1 := flag.String("p", "", "The port that the Chord client will bind to and listen on")
 	ip2 := flag.String("ja", "", "The IP address of the machine running a Chord node")
@@ -244,11 +281,11 @@ func commandlineFlags() {
 		*ip1 = chord.GetAddress()
 	}
 	if *port1 == "" {
-		fmt.Println("Local Node Port hasn't been set\n<Setting to default (8080)>")
+		fmt.Println("Local Node CPort hasn't been set\n<Setting to default (8080)>")
 		*port1 = "8080"
 	}
 
-	c.debug = *debuggingOn
+	c.Debug = *debuggingOn
 	if *delay1 > 60000 || *delay1 < 1 {
 		*delay1 = 30000
 	}
@@ -277,9 +314,9 @@ func commandlineFlags() {
 	if (*idOverwrite != "") && (len(*idOverwrite) == 48) {
 		id = *idOverwrite
 	}
-	c.node = chord.NewNode(port, c.debug, id)
+	c.Node = chord.NewNode(port, c.Debug, id)
 
-	fmt.Printf("<LocalNode>: %+v\n", *c.node)
+	fmt.Printf("<LocalNode>: %+v\n", *c.Node)
 
 	if *ip2 != "" || *port2 != "" {
 		hostIP := *ip2
@@ -288,8 +325,12 @@ func commandlineFlags() {
 		hostID := chord.Hash(hostAddress).String()
 		hostNode := chord.Node{Host: hostIP, Port: hostPort, Id: hostID, Address: hostAddress}
 		fmt.Printf("<HostNode>: %+v\n", hostNode)
-		c.node.Join(hostAddress)
+		err := c.Node.Join(hostAddress)
+		if err != nil {
+			return
+		}
 	} else {
-		c.node.Create()
+		//c.Create()
+		c.Node.Create()
 	}
 }
