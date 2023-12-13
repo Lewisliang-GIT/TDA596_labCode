@@ -84,7 +84,7 @@ func (c *Command) Create(args ...string) error {
 	//if err != nil {
 	//	return err
 	//}
-	c.Server.node.Create()
+	c.Server.Snode.Create()
 	fmt.Println("Node(created) listening at ", c.Node.Address)
 	return nil
 }
@@ -249,45 +249,31 @@ Commands related to DHT rings:
 	quit		shut down. This quits and ends the program. 
 
 Commands related to finding and inserting keys and values
-	put <k> <v>		insert the given key and value.
+	storefile <k> <v>		uploadfile of the given key and value.
 	putrandom <n>	randomly generate n <key, value> to insert.
-	get <k>			find the given key in the currently active ring. 
+	lookup <k>			find the given key in the currently active ring. 
 	delete <k> 		the peer deletes it from the ring.
 
 Commands that are useful mainly for debugging:
-	dump			display information about the current node.
-	dumpkey <k>		similar to dump, but this one finds the node resposible for <key>.
-	dumpaddr <add>	similar to above, but query a specific host and dump its info.
-	dumpall			walk around the ring, dumping all in clockwise order.
+	printstate		display information about the current node.
+	showkey <k>		similar to printstate, but this one finds the node resposible for <key>.
+	showaddr <add>	similar to above, but query a specific host and show its info.
+	showall			walk around the ring, dumping all in clockwise order.
 
 Get more details of each Command, you can use order <help+Command>
-eg: help dump, then you will get details of 'dump'
+eg: help printstate, then you will get details of 'printstate'
 `)
 	case 1:
 
 		switch args[0] {
 		case "help":
 			fmt.Println("the simplest Command. This displays a list of recognized commands. Also, the current Command")
-		case "CPort":
+		case "port":
 			fmt.Println(`
-CPort <n> or CPort
+port <n> or port
 set the CPort that this node should listen on. 
 By default, this should be CPort 3410, but users can set it to something else.
 This Command only works before a ring has been created or joined. After that point, trying to issue this Command is an error.
-`)
-		case "create":
-			fmt.Println(`
-create
-create a new ring.
-This Command only works before a ring has been created or joined. 
-After that point, trying to issue this Command is an error.
-`)
-		case "join":
-			fmt.Println(`
-join <address>
-join an existing ring, one of whose nodes is at the address specified.
-This Command only works before a ring has been created or joined.
-After that point, trying to issue this Command is an error.
 `)
 		case "quit":
 			fmt.Println(`
@@ -296,12 +282,12 @@ shut down.This quits and ends the program.
 If this was the last instance in a ring, the ring is effectively shut down.
 If this is not the last instance, it should send all of its data to its immediate successor before quitting. Other than that, it is not necessary to notify the rest of the ring when a node shuts down.
 `)
-		case "put":
+		case "storefile":
 			fmt.Println(`
 there are those related to finding and inserting keys and values.
 A <key> is any sequence of one or more non-space characters, as is a value.
 
-put <key> <value> 
+storefile <key> <value> 
 insert the given key and value into the currently active ring. 
 The instance must find the peer that is responsible for the given key using a DHT lookup operation, 
 then contact that host directly and send it the key and value to be stored.
@@ -314,12 +300,12 @@ A <key> is any sequence of one or more non-space characters, as is a value.
 putrandom <n>
 randomly generate n keys (and accompanying values) and put each pair into the ring. Useful for debugging.
 `)
-		case "get":
+		case "lookup":
 			fmt.Println(`
 Next, there are those related to finding and inserting keys and values.
 A <key> is any sequence of one or more non-space characters, as is a value.
 
-get <key>
+lookup <key>
 find the given key in the currently active ring.
 The instance must find the peer that is responsible for the given key using a DHT lookup operation, 
 then contact that host directly and retrieve the value and display it to the local user.
@@ -333,35 +319,35 @@ delete <key>
 similar to lookup, but instead of retrieving the value and displaying it, the peer deletes it from the ring.
 
 `)
-		case "dump":
+		case "printstate":
 			fmt.Println(`
 For debugging
 
-dump
+printstate
 display information about the current node, including the range of keys it is resposible for,
  its predecessor and successor links, its finger table, and the actual key/value pairs that it stores.
 `)
-		case "dumpkey":
+		case "showkey":
 			fmt.Println(`
 For debugging
 
-dumpkey <key>
+showkey <key>
 similar to dump, but this one finds the node resposible for <key>, 
 asks it for its dump info, and displays it to the local user. 
 This allows a user at one terminal to query any part of the ring.
 `)
-		case "dumpaddr":
+		case "showaddr":
 			fmt.Println(`
 For debugging
 
-dumpaddr <address>
+showaddr <address>
 similar to above, but query a specific host and dump its info.
 `)
-		case "dumpall":
+		case "showall":
 			fmt.Println(`
 For debugging
 
-dumpall
+showall
 walk around the ring, dumping all information about every peer in the ring in clockwise order 
 (display the current host, then its successor, etc).
 `)

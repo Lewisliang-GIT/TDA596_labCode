@@ -12,7 +12,7 @@ import (
 
 const (
 	m           = 160 // 0-base indexing
-	suSize      = 3
+	suSize      = 32
 	refreshTime = 100 * time.Millisecond // adjust to avoid error:connectex: Only one usage of each socket address (protocol/network address/CPort) is normally permitted. in Stabilize with Notify err:
 )
 
@@ -297,7 +297,7 @@ func (n *Node) fixFingerTable() {
 
 		if response == "" {
 			if err := n.FindSuccessor(id, &response); err != nil || response == "" {
-				fmt.Printf("fixFingertable err at: %v\n", err)
+				log.Printf("fixFingertable err at: %v\n", err)
 				// fmt.Println(n.next, n.Address, response)
 				return
 			}
@@ -333,12 +333,12 @@ func (n *Node) stabilize() {
 		if err := n.fixSuccessorTable(); err != nil {
 			n.Successor = n.SuccessorTable[0]
 			// RPCNotify(n.Successor, Addr(n))
-			fmt.Printf("[%s]Stabilize fix SuccessoTable %v\n", n.Address, err)
+			log.Printf("[%s]Stabilize fix SuccessoTable %v\n", n.Address, err)
 			continue
 		}
 
 		if err := RPCNotify(n.Successor, n.Address); err != nil {
-			fmt.Printf("[%s]Stabilize Notify %v\n", n.Address, err)
+			log.Printf("[%s]Stabilize Notify %v\n", n.Address, err)
 		}
 
 		return

@@ -28,40 +28,18 @@ func init() {
 
 // GetAddress local address
 func GetAddress() string {
-	var address string
-	interfaces, err := net.Interfaces()
+	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		log.Panicf("init: GetAddress of finding network: %v", err)
+		log.Fatal(err)
 	}
+	defer conn.Close()
 
-	// find the first non-loopback interface with an IP address
-	for _, elt := range interfaces {
-
-		if elt.Flags&net.FlagLoopback == 0 && elt.Flags&net.FlagUp != 0 {
-			addres, err := elt.Addrs()
-			if err != nil {
-				log.Panicf("init: Get addresses of local address: %v", err)
-			}
-
-			for _, addr := range addres {
-				if ipnet, ok := addr.(*net.IPNet); ok {
-					if ip4 := ipnet.IP.To4(); len(ip4) == net.IPv4len {
-						address = ip4.String()
-						break
-					}
-				}
-			}
-		}
-	}
-	if address == "" {
-		log.Panicf("init: failed to find non-loopback interface with valid address on this node")
-	}
-
-	return address
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
 }
 
 type Server struct {
-	node      *Node
+	Snode     *Node
 	Listener  net.Listener
 	Rpcserver *rpc.Server
 	// listening bool
@@ -78,7 +56,7 @@ type Server struct {
 func NewServer(n *Node) *Server {
 	//什么时候消亡？？
 	p := &Server{
-		node: n, // only one element is inited
+		Snode: n, // only one element is inited
 		// listening: false,
 	}
 	Logger.Println("--------------------------------------------------------------- <<<")
@@ -94,24 +72,24 @@ func (s *Server) Listen() error {
 	// }
 
 	s.Rpcserver = rpc.NewServer()
-	err := s.Rpcserver.Register(s.node)
+	err := s.Rpcserver.Register(s.Snode)
 	if err != nil {
 		return err
 	} //using s.node as a object to do things by rpc
 	// rpc.HandleHTTP()
 
-	ler, err := net.Listen("tcp", ":"+s.node.Port) // address
+	ler, err := net.Listen("tcp", ":"+s.Snode.Port) // address
 	if err != nil {
 		fmt.Printf("listen error: %v", err)
 		Logger.Panicf("listen error: %v", err)
 		//panic(err)
 	} else {
-		Logger.Println("listen at ", ":"+s.node.Port)
+		Logger.Println("listen at ", ":"+s.Snode.Port)
 	}
 
-	s.node.Create()
+	s.Snode.Create()
 	s.Listener = ler
-	s.node.Listening = true
+	s.Snode.Listening = true
 
 	go s.Rpcserver.Accept(s.Listener) // goroutine
 	return nil
@@ -123,14 +101,14 @@ func (s *Server) Join(address string) error {
 	//if err := s.Listen(); err != nil {
 	//	return err
 	//}
-	return s.node.Join(address)
+	return s.Snode.Join(address)
 }
 
 // for a Server, it means unlisten
 func (s *Server) Quit() error {
-	s.node.merge()
+	s.Snode.merge()
 
-	s.node.Listening = false
+	s.Snode.Listening = false
 	if err := s.Listener.Close(); err != nil {
 		fmt.Println(err)
 	}
@@ -148,7 +126,7 @@ func (s *Server) Quit() error {
 }
 
 func (s *Server) RemoveFile() error {
-	err := os.Remove("./backup/" + Hash(s.node.Address).String() + ".txt")
+	err := os.Remove("./backup/" + Hash(s.Snode.Address).String() + ".txt")
 	return err
 }
 
@@ -166,13 +144,13 @@ Data: %v
 Successors: %v
 Predecessor: %v
 Fingers: %v
-`, Hash(s.node.Address), s.IsListening(), s.node.Address, s.node.Data, s.node.SuccessorTable, s.node.Predecessor, s.node.FingerTable)
+`, Hash(s.Snode.Address), s.IsListening(), s.Snode.Address, s.Snode.Data, s.Snode.SuccessorTable, s.Snode.Predecessor, s.Snode.FingerTable)
 }
 
 func (s *Server) Backup() {
-	s.node.backup()
+	s.Snode.backup()
 }
 
 func (s *Server) Recover() {
-	s.node.recover()
+	s.Snode.recover()
 }
