@@ -33,7 +33,7 @@ func init() {
 func main() {
 	fmt.Printf("--------------------- <%s> ---------------------\n", chord.GetAddress())
 	c := &Cmd
-	commandlineFlags(c)
+	c = commandlineFlags(c)
 	log.Println(c.Node)
 	c.Server = chord.NewServer(c.Node)
 	err := rpc.Register(c.Node)
@@ -260,7 +260,7 @@ func main3() {
 
 //operator domains
 
-func commandlineFlags(c *chord.Command) {
+func commandlineFlags(c *chord.Command) *chord.Command {
 	ip1 := flag.String("a", "", "The IP address that the Chord client will bind to")
 	port1 := flag.String("p", "", "The port that the Chord client will bind to and listen on")
 	ip2 := flag.String("ja", "", "The IP address of the machine running a Chord node")
@@ -315,6 +315,7 @@ func commandlineFlags(c *chord.Command) {
 		id = *idOverwrite
 	}
 	c.Node = chord.NewNode(port, c.Debug, id)
+	c.CPort = port
 
 	fmt.Printf("<LocalNode>: %+v\n", *c.Node)
 
@@ -325,12 +326,10 @@ func commandlineFlags(c *chord.Command) {
 		hostID := chord.Hash(hostAddress).String()
 		hostNode := chord.Node{Host: hostIP, Port: hostPort, Id: hostID, Address: hostAddress}
 		fmt.Printf("<HostNode>: %+v\n", hostNode)
-		err := c.Node.Join(hostAddress)
-		if err != nil {
-			return
-		}
+		return c
 	} else {
 		//c.Create()
 		c.Node.Create()
+		return c
 	}
 }

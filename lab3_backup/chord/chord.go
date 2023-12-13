@@ -23,7 +23,7 @@ func Call(address string, method string, request interface{}, response interface
 		return errors.New("Call Err: No address")
 	}
 
-	client, err := rpc.Dial("tcp", address)
+	client, err := rpc.DialHTTP("tcp", address)
 	if err != nil {
 		// Logger.Printf("dial failed: %v", err)
 		// fmt.Printf("Dial: %v\n", err)

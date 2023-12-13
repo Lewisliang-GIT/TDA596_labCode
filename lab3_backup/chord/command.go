@@ -3,6 +3,7 @@ package chord
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 )
@@ -35,7 +36,7 @@ type Command struct {
 	CPort  string // dht.DefaultPort
 	host   string // dht.DefaultHost
 	id     string
-	line   []string
+	Line   []string
 
 	Debug     bool
 	listening bool // or begin maybe
@@ -79,10 +80,10 @@ func (c *Command) Create(args ...string) error {
 	}
 
 	//c._init()
-	err := c.Server.Listen()
-	if err != nil {
-		return err
-	}
+	//err := c.Server.Listen()
+	//if err != nil {
+	//	return err
+	//}
 	fmt.Println("Node(created) listening at ", c.Node.Address)
 	return nil
 }
@@ -100,7 +101,7 @@ func (c *Command) Join(args ...string) error {
 	}
 
 	//c._init()
-	addres := DefaultHost + ":" + DefaultPort
+	var addres string //addres := DefaultHost + ":" + DefaultPort
 	if len(args) == 1 {
 		addres = args[0]
 	}
@@ -108,10 +109,10 @@ func (c *Command) Join(args ...string) error {
 	err := c.Server.Join(addres)
 	if err != nil {
 		c.listening = false
-		// log.Panicf("Join error %v", err)
-		// return err
+		log.Panicf("Join error %v", err)
+		return err
 	}
-	// fmt.Println("Joined at ", addres)
+	fmt.Println("Joined at ", addres)
 	return nil
 }
 

@@ -120,9 +120,9 @@ func (s *Server) Listen() error {
 // avoid repete listening???
 // the CPort is Server.node.CPort(not CPort outside)
 func (s *Server) Join(address string) error {
-	if err := s.Listen(); err != nil {
-		return err
-	}
+	//if err := s.Listen(); err != nil {
+	//	return err
+	//}
 	return s.node.Join(address)
 }
 
