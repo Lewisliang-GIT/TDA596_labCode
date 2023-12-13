@@ -84,6 +84,7 @@ func (c *Command) Create(args ...string) error {
 	//if err != nil {
 	//	return err
 	//}
+	c.Server.node.Create()
 	fmt.Println("Node(created) listening at ", c.Node.Address)
 	return nil
 }
@@ -184,8 +185,8 @@ func (c *Command) Put(args ...string) error {
 	if !c.listening {
 		return NO_SERVICE
 	}
-
-	if err := RPCPut(c.Node.Address, args[0], args[1]); err != nil {
+	k := Hash(args[0]).String()
+	if err := RPCPut(c.Node.Address, k, args[0]); err != nil {
 		//fmt.Fprintln(&buffer, false)
 		return err
 	} else {

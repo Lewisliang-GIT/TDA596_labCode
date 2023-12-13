@@ -61,9 +61,9 @@ func GetAddress() string {
 }
 
 type Server struct {
-	node     *Node
-	Listener net.Listener
-	server   *rpc.Server
+	node      *Node
+	Listener  net.Listener
+	Rpcserver *rpc.Server
 	// listening bool
 
 	// logfile *os.File
@@ -93,8 +93,8 @@ func (s *Server) Listen() error {
 	// return errors.New("Already listening")
 	// }
 
-	s.server = rpc.NewServer()
-	err := s.server.Register(s.node)
+	s.Rpcserver = rpc.NewServer()
+	err := s.Rpcserver.Register(s.node)
 	if err != nil {
 		return err
 	} //using s.node as a object to do things by rpc
@@ -113,7 +113,7 @@ func (s *Server) Listen() error {
 	s.Listener = ler
 	s.node.Listening = true
 
-	go s.server.Accept(s.Listener) // goroutine
+	go s.Rpcserver.Accept(s.Listener) // goroutine
 	return nil
 }
 

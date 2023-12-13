@@ -147,7 +147,11 @@ func (n *Node) Join(address string) error {
 	// 	n.dump()
 	// }
 
-	// n.stabilize()
+	go n.checkSurvival()
+	go n.checkPredecessorPeriod()
+	go n.stabilizePeriod()
+	go n.fixFingerTablePeriod()
+	go n.backupPeriod()
 
 	return nil
 }

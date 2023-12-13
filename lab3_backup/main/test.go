@@ -36,6 +36,7 @@ func main() {
 	c = commandlineFlags(c)
 	log.Println(c.Node)
 	c.Server = chord.NewServer(c.Node)
+	c.Server.Rpcserver = rpc.NewServer()
 	err := rpc.Register(c.Node)
 	if err != nil {
 		log.Fatal("error registering node", err)
@@ -329,7 +330,6 @@ func commandlineFlags(c *chord.Command) *chord.Command {
 		return c
 	} else {
 		//c.Create()
-		c.Node.Create()
 		return c
 	}
 }

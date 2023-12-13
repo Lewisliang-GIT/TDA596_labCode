@@ -111,18 +111,18 @@ func RPCPut(address string, key string, val string) error {
 	//
 	//fmt.Printf("File Sent To Node: %+v\nNew File Path: %s\n", *sendTo, fileName)
 	//return sendTo
-	put_node := Find(address, fileKey) // key's Successor
+	put_node := Find(address, fileName) // key's Successor
 	if put_node == "" {
 		return errors.New("can't get address")
 	}
 	PostSender(address, val)
 
 	var response bool
-	if err := Call(put_node, "Node.Put", KVP{K: key, V: val}, &response); err != nil {
+	if err := Call(put_node, "Node.Put", KVP{K: fileName, V: fileKey}, &response); err != nil {
 		return err
 	}
 
-	fmt.Printf("Put %s, %s in [%v]\n", key, val, put_node)
+	fmt.Printf("Put %s, %s in [%v]\n", fileName, fileKey, put_node)
 	if !response {
 		return errors.New("No put")
 	}
