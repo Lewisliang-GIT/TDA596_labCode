@@ -81,7 +81,7 @@ func (n *Node) Create() {
 	go n.checkPredecessorPeriod()
 	go n.stabilizePeriod()
 	go n.fixFingerTablePeriod()
-	go n.backupPeriod()
+	//go n.backupPeriod()
 }
 
 func (n *Node) Besplited(address string, response *bool) error {
@@ -151,7 +151,7 @@ func (n *Node) Join(address string) error {
 	go n.checkPredecessorPeriod()
 	go n.stabilizePeriod()
 	go n.fixFingerTablePeriod()
-	go n.backupPeriod()
+	//go n.backupPeriod()
 
 	return nil
 }
@@ -188,6 +188,7 @@ func (n *Node) fixSuccessorTable() error {
 // Find finger[i] ∈ (n, id)
 func (n *Node) findFingerTable(id *big.Int) string {
 	for i := m - 1; i >= 0; i-- {
+		log.Printf("ping figertable %v", n.FingerTable[i])
 		if _, err := RPCPing(n.FingerTable[i]); err != nil {
 			continue
 		}
