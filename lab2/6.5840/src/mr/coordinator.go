@@ -31,7 +31,7 @@ type Coordinator struct {
 
 // an example RPC handler.
 //
-// the RPC argument and reply types are defined in rpc.go.
+// the RPC argument and reply types are defined in fingertable.go.
 func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
 	return nil

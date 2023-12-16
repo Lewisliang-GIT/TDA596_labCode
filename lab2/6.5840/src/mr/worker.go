@@ -152,7 +152,7 @@ func doMap(reply *RequestTaskReply, mapf func(string, string) []KeyValue) {
 
 // example function to show how to make an RPC call to the coordinator.
 //
-// the RPC argument and reply types are defined in rpc.go.
+// the RPC argument and reply types are defined in fingertable.go.
 func CallExample() {
 
 	// declare an argument structure.
