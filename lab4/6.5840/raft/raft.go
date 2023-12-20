@@ -54,6 +54,14 @@ type logEntries struct {
 	Term    int
 }
 
+type States int
+
+const (
+	Leader States = iota
+	Candidate
+	Follower
+)
+
 // A Go object implementing a single Raft peer.
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
@@ -67,6 +75,7 @@ type Raft struct {
 	// state a Raft server must maintain.
 	currentTerm int
 	votedFor    int
+	states      States
 	Logs        []logEntries
 }
 
@@ -79,6 +88,12 @@ func (rf *Raft) GetState() (int, bool) {
 	// Your code here (2A).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	term = rf.currentTerm
+	if rf.states != Leader {
+		isleader = false
+		return term, isleader
+	}
+	isleader = true
 	return term, isleader
 }
 
@@ -133,17 +148,37 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 // field names must start with capital letters!
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
+	Term        int
+	CandidateId int
 }
 
 // example RequestVote RPC reply structure.
 // field names must start with capital letters!
 type RequestVoteReply struct {
 	// Your data here (2A).
+	Term        int
+	VoteGranted bool
 }
 
 // example RequestVote RPC handler.
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	if args.Term < rf.currentTerm {
+		reply.VoteGranted = false
+		reply.Term = rf.currentTerm
+		return
+	}
+	if args.Term > rf.currentTerm || (args.Term == rf.currentTerm && (rf.votedFor == -1 || rf.votedFor == args.CandidateId)) {
+		rf.states = Follower
+		rf.votedFor = args.CandidateId
+		rf.currentTerm = args.Term
+		reply.VoteGranted = true
+		reply.Term = rf.currentTerm
+		//rf.Time = time.Now()
+		//rf.persist()
+	}
 }
 
 // example code to send a RequestVote RPC to a server.
@@ -221,9 +256,18 @@ func (rf *Raft) killed() bool {
 
 func (rf *Raft) ticker() {
 	for rf.killed() == false {
-
 		// Your code here (2A)
 		// Check if a leader election should be started.
+		rf.mu.Lock()
+		states := rf.states
+		rf.mu.Unlock()
+		switch states {
+		case Follower:
+			fallthrough
+		case Leader:
+
+		case Candidate:
+		}
 
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
@@ -249,7 +293,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (2A, 2B, 2C).
-
+	rf.states = Follower
+	rf.votedFor = -1
+	rf.Logs = make([]logEntries, 0)
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
