@@ -116,7 +116,6 @@ type Raft struct {
 	nextIndex  []int
 	matchIndex []int
 
-	// 由自己追加的:
 	status   Status
 	overtime time.Duration
 	timer    *time.Ticker
@@ -172,7 +171,7 @@ type InstallSnapshotArgs struct {
 	LeaderId         int
 	LastIncludeIndex int    // snap index
 	LastIncludeTerm  int    // snap index
-	Data             []byte // 快照区块的原始字节流数据
+	Data             []byte // snap data stream
 	//Done bool
 }
 
@@ -363,7 +362,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	}
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	for !ok {
-		// 失败重传
+		//retry
 		if rf.killed() {
 			return false
 		}
