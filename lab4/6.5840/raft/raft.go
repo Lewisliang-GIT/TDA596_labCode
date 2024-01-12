@@ -11,6 +11,24 @@ import (
 import "bytes"
 import "6.5840/labgob"
 
+// example RequestVote RPC arguments structure.
+// field names must start with capital letters!
+type RequestVoteArgs struct {
+	// Your data here (2A, 2B).
+	Term         int //candidate’s term
+	CandidateId  int //candidate requesting vote
+	LastLogIndex int //index of candidate’s last log entry
+	LastLogTerm  int //term of candidate’s last log entry
+}
+
+// example RequestVote RPC reply structure.
+// field names must start with capital letters!
+type RequestVoteReply struct {
+	// Your data here (2A).
+	Term        int  //currentTerm, for candidate to update itself
+	VoteGranted bool //true means candidate received vote
+}
+
 type ApplyMsg struct {
 	CommandValid bool
 	Command      interface{}
@@ -26,6 +44,23 @@ type ApplyMsg struct {
 type LogEntry struct {
 	Command interface{}
 	Term    int
+}
+
+type AppendEntriesArgs struct {
+	Term         int        //leader’s term
+	LeaderId     int        //so follower can redirect clients
+	PrevLogIndex int        //index of log entry immediately preceding new ones
+	PrevLogTerm  int        //term of prevLogIndex entry
+	Entries      []LogEntry //log entries to store (empty for heartbeat; may send more than one for efficiency)
+	LeaderCommit int        //leader’s commitIndex
+}
+
+type AppendEntriesReply struct {
+	Term    int  //currentTerm, for leader to update itself
+	Success bool //true if follower contained entry matching prevLogIndex and prevLogTerm
+
+	ConflictTerm  int // 2C
+	ConflictIndex int // 2C
 }
 
 const (
@@ -115,24 +150,6 @@ func (rf *Raft) readPersist(data []byte) {
 	}
 }
 
-// example RequestVote RPC arguments structure.
-// field names must start with capital letters!
-type RequestVoteArgs struct {
-	// Your data here (2A, 2B).
-	Term         int //candidate’s term
-	CandidateId  int //candidate requesting vote
-	LastLogIndex int //index of candidate’s last log entry
-	LastLogTerm  int //term of candidate’s last log entry
-}
-
-// example RequestVote RPC reply structure.
-// field names must start with capital letters!
-type RequestVoteReply struct {
-	// Your data here (2A).
-	Term        int  //currentTerm, for candidate to update itself
-	VoteGranted bool //true means candidate received vote
-}
-
 // the service says it has created a snapshot that has
 // all info up to and including index. this means the
 // service no longer needs the log through (and including)
@@ -148,7 +165,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	defer rf.persist()
-	DPrintf("Candidate[raft%v][term:%v] request vote: raft%v[%v] 's term%v\n", args.CandidateId, args.Term, rf.me, rf.state, rf.currentTerm)
 	if args.Term < rf.currentTerm ||
 		(args.Term == rf.currentTerm && rf.votedFor != -1 && rf.votedFor != args.CandidateId) {
 		reply.Term = rf.currentTerm
@@ -180,41 +196,10 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.electionTimer.Reset(randTimeDuration())
 }
 
-type AppendEntriesArgs struct {
-	Term         int        //leader’s term
-	LeaderId     int        //so follower can redirect clients
-	PrevLogIndex int        //index of log entry immediately preceding new ones
-	PrevLogTerm  int        //term of prevLogIndex entry
-	Entries      []LogEntry //log entries to store (empty for heartbeat; may send more than one for efficiency)
-	LeaderCommit int        //leader’s commitIndex
-}
-
-type AppendEntriesReply struct {
-	Term    int  //currentTerm, for leader to update itself
-	Success bool //true if follower contained entry matching prevLogIndex and prevLogTerm
-
-	//Figure 8: A time sequence showing why a leader cannot determine commitment using log entries from older terms. In
-	// (a) S1 is leader and partially replicates the log entry at index
-	// 2. In (b) S1 crashes; S5 is elected leader for term 3 with votes
-	// from S3, S4, and itself, and accepts a different entry at log
-	// index 2. In (c) S5 crashes; S1 restarts, is elected leader, and
-	// continues replication. At this point, the log entry from term 2
-	// has been replicated on a majority of the servers, but it is not
-	// committed. If S1 crashes as in (d), S5 could be elected leader
-	// (with votes from S2, S3, and S4) and overwrite the entry with
-	// its own entry from term 3. However, if S1 replicates an entry from its current term on a majority of the servers before
-	// crashing, as in (e), then this entry is committed (S5 cannot
-	// win an election). At this point all preceding entries in the log
-	// are committed as well.
-	ConflictTerm  int // 2C
-	ConflictIndex int // 2C
-}
-
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	defer rf.persist()
-	DPrintf("leader[raft%v][term:%v] beat term:%v [raft%v][%v]\n", args.LeaderId, args.Term, rf.currentTerm, rf.me, rf.state)
 	reply.Success = true
 
 	// 1. Reply false if term < currentTerm
@@ -455,7 +440,6 @@ func (rf *Raft) switchStateTo(state int) {
 	if state == rf.state {
 		return
 	}
-	DPrintf("Term %d: server %d convert from %v to %v\n", rf.currentTerm, rf.me, rf.state, state)
 	rf.state = state
 	switch state {
 	case Follower:
@@ -568,7 +552,6 @@ func (rf *Raft) heartbeat(server int) {
 
 func (rf *Raft) startElection() {
 
-	// DPrintf("raft%v is starting election\n", rf.me)
 	rf.currentTerm += 1
 	rf.votedFor = rf.me //vote for me
 	rf.persist()
@@ -586,7 +569,6 @@ func (rf *Raft) startElection() {
 					LastLogIndex: lastLogIndex,
 					LastLogTerm:  rf.log[lastLogIndex].Term,
 				}
-				// DPrintf("raft%v[%v] is sending RequestVote RPC to raft%v\n", rf.me, rf.state, peer)
 				rf.mu.Unlock()
 				var reply RequestVoteReply
 				if rf.sendRequestVote(peer, &args, &reply) {
@@ -615,7 +597,6 @@ func (rf *Raft) setCommitIndex(commitIndex int) {
 	// apply all entries between lastApplied and committed
 	// should be called after commitIndex updated
 	if rf.commitIndex > rf.lastApplied {
-		DPrintf("%v apply from index %d to %d", rf, rf.lastApplied+1, rf.commitIndex)
 		entriesToApply := append([]LogEntry{}, rf.log[(rf.lastApplied+1):(rf.commitIndex+1)]...)
 
 		go func(startIdx int, entries []LogEntry) {
