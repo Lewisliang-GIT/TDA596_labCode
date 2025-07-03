@@ -1,5 +1,3 @@
-# <mark>实验的readme在lab1文件夹下，不是这个！</mark>
-
 # lab1
 
 ## http_server.go
@@ -17,3 +15,11 @@ To test concurrent requests.
 # Lab2
 
 mapreduce
+
+# Lab3
+
+chord
+
+# Lab4
+
+Raft
